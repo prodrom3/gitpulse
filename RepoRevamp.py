@@ -3,6 +3,7 @@ import subprocess
 import concurrent.futures
 import logging
 import datetime
+import sys
 
 def update_repository(repo_path):
     logging.info(f"Updating: {repo_path}")
@@ -33,7 +34,10 @@ def setup_logging():
 
 def main():
     setup_logging()
-    root_directory = os.getcwd()
+    if len(sys.argv) > 1:
+        root_directory = sys.argv[1]
+    else:
+        root_directory = os.getcwd()
 
     repositories = []
     for root, dirs, files in os.walk(root_directory):
