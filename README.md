@@ -1,12 +1,16 @@
-# RepoRevamp - Efficient GitHub Repository Updater
+# RepoRevamp
+#### Efficient GitHub Repository Updater
 
-RepoRevamp is a Python script designed to efficiently update multiple GitHub repositories present in the current directory and its subdirectories. It utilizes multi-threading to significantly improve the update process, making it a swift and agile tool for keeping your cloned repositories up-to-date.
+`RepoRevamp` is a Python script designed to efficiently update multiple GitHub repositories present in the current directory and its subdirectories. It utilizes multi-threading to significantly improve the update process, making it a swift and agile tool for keeping your cloned repositories up-to-date.
 
 ## Purpose
-Have you ever found yourself with a bunch of cloned GitHub repositories scattered across your local machine? Keeping them all up-to-date manually can be time-consuming and tedious. That's where RepoRevamp comes to the rescue! It automates the process of updating your repositories with the latest changes from their respective remotes on GitHub.
+Have you ever found yourself with a bunch of cloned GitHub repositories scattered across your local machine? Keeping them all up-to-date manually can be time-consuming and tedious. That's where `RepoRevamp` comes to the rescue! It automates the process of updating your repositories with the latest changes from their respective remotes on GitHub.
+
+
 
 
 ## Installation
+
 
 1. Clone this repository to your local machine using the following command:
 
@@ -19,9 +23,9 @@ git clone https://github.com/yourusername/RepoRevamp.git
 cd RepoRevamp
 ```
 
-3. Before running the script, ensure you have Python installed on your system. If not, you can download it from the official Python website: Python Downloads
+3. Before running the script, ensure you have Python installed on your system. If not, you can download it from the official Python website: [Python Downloads](https://www.python.org/downloads/)
 
-4. Install the required requests library by executing the following command:
+4. Install the required `requests` library by executing the following command:
 
 ```bash
 pip install requests
