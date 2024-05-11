@@ -4,6 +4,10 @@
 
 `RepoRevamp` is a Python script designed to efficiently update multiple GitHub repositories present in the current directory and its subdirectories. It utilizes multi-threading to significantly improve the update process, making it a swift and agile tool for keeping your cloned repositories up-to-date.
 
+<p align="center">
+  <img width="460" height="460" src="https://github.com/prodrom3/RepoRevamp/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d">
+</p>
+
 ## Purpose
 Have you ever found yourself with a bunch of cloned GitHub repositories scattered across your local machine? 
 
