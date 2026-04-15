@@ -19,13 +19,14 @@ from .commands import add as _cmd_add
 from .commands import list_cmd as _cmd_list
 from .commands import note as _cmd_note
 from .commands import pull as _cmd_pull
+from .commands import refresh as _cmd_refresh
 from .commands import rm as _cmd_rm
 from .commands import show as _cmd_show
 from .commands import tag as _cmd_tag
 from .commands import triage as _cmd_triage
 
 _KNOWN_VERBS: frozenset[str] = frozenset(
-    {"pull", "add", "list", "show", "tag", "note", "triage", "rm"}
+    {"pull", "add", "list", "show", "tag", "note", "triage", "rm", "refresh"}
 )
 
 
@@ -70,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     _cmd_note.add_parser(subparsers)
     _cmd_triage.add_parser(subparsers)
     _cmd_rm.add_parser(subparsers)
+    _cmd_refresh.add_parser(subparsers)
     return parser
 
 

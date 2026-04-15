@@ -33,6 +33,25 @@ def add_parser(subparsers: Any) -> None:
         help="Only repos not pulled / shown in the last DAYS days",
     )
     p.add_argument(
+        "--upstream-archived",
+        action="store_true",
+        help="Only repos whose upstream is archived (run `refresh` first)",
+    )
+    p.add_argument(
+        "--upstream-dormant",
+        type=int,
+        default=None,
+        metavar="DAYS",
+        help="Only repos whose upstream had no push in the last DAYS days",
+    )
+    p.add_argument(
+        "--upstream-stale",
+        type=int,
+        default=None,
+        metavar="DAYS",
+        help="Only repos whose upstream cache is older than DAYS (or missing)",
+    )
+    p.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON (stable schema) instead of a table",
@@ -101,6 +120,9 @@ def run(args: argparse.Namespace) -> int:
                 tag=args.tag,
                 status=args.status,
                 untouched_days=args.untouched_over,
+                upstream_archived=getattr(args, "upstream_archived", False),
+                upstream_dormant_days=getattr(args, "upstream_dormant", None),
+                upstream_stale_days=getattr(args, "upstream_stale", None),
             )
     except OSError as e:
         print(f"gitpulse: error: {e}", file=sys.stderr)

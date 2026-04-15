@@ -264,6 +264,239 @@ class TestTagsAndNotes(unittest.TestCase):
             self.assertFalse(index.add_note(conn, "/nope", "hi"))
 
 
+class TestUpstreamMeta(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.db = os.path.join(self.tmp, "index.db")
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _seed(self, conn):
+        a = index.add_repo(conn, "/tmp/a")
+        b = index.add_repo(conn, "/tmp/b")
+        c = index.add_repo(conn, "/tmp/c")
+        return a, b, c
+
+    def test_upsert_and_get(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/tmp/a")
+            self.assertTrue(
+                index.upsert_upstream_meta(
+                    conn,
+                    rid,
+                    {
+                        "provider": "github",
+                        "host": "github.com",
+                        "owner": "prodrom3",
+                        "name": "gitpulse",
+                        "stars": 42,
+                        "archived": False,
+                        "default_branch": "master",
+                    },
+                )
+            )
+            meta = index.get_upstream_meta(conn, rid)
+        self.assertEqual(meta["provider"], "github")
+        self.assertEqual(meta["stars"], 42)
+        self.assertEqual(meta["archived"], 0)
+        self.assertIsNotNone(meta["fetched_at"])
+
+    def test_archived_is_coerced(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/tmp/a")
+            index.upsert_upstream_meta(
+                conn,
+                rid,
+                {
+                    "provider": "github",
+                    "host": "github.com",
+                    "owner": "x",
+                    "name": "y",
+                    "archived": True,
+                },
+            )
+            meta = index.get_upstream_meta(conn, rid)
+        self.assertEqual(meta["archived"], 1)
+
+    def test_replace_on_second_upsert(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/tmp/a")
+            index.upsert_upstream_meta(
+                conn,
+                rid,
+                {"provider": "github", "host": "github.com", "owner": "x", "name": "y", "stars": 1},
+            )
+            index.upsert_upstream_meta(
+                conn,
+                rid,
+                {"provider": "github", "host": "github.com", "owner": "x", "name": "y", "stars": 2},
+            )
+            rows = conn.execute("SELECT COUNT(*) FROM upstream_meta").fetchone()
+            meta = index.get_upstream_meta(conn, rid)
+        self.assertEqual(rows[0], 1)
+        self.assertEqual(meta["stars"], 2)
+
+    def test_get_missing(self):
+        with index.connect(self.db) as conn:
+            self.assertIsNone(index.get_upstream_meta(conn, 999))
+            rid = index.add_repo(conn, "/tmp/a")
+            self.assertIsNone(index.get_upstream_meta(conn, rid))
+
+    def test_cascade_delete(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/tmp/a")
+            index.upsert_upstream_meta(
+                conn,
+                rid,
+                {"provider": "github", "host": "github.com", "owner": "x", "name": "y"},
+            )
+            index.remove_repo(conn, rid)
+            rows = conn.execute("SELECT COUNT(*) FROM upstream_meta").fetchone()
+        self.assertEqual(rows[0], 0)
+
+    def test_list_stale_upstream_includes_never_fetched(self):
+        with index.connect(self.db) as conn:
+            _, b, _ = self._seed(conn)
+            # b has fresh cache
+            index.upsert_upstream_meta(
+                conn,
+                b,
+                {"provider": "github", "host": "github.com", "owner": "x", "name": "y"},
+            )
+            stale = index.list_stale_upstream(conn, ttl_days=7)
+        paths = {r["path"] for r in stale}
+        # a and c have no upstream row; b is fresh -> excluded
+        self.assertIn(_R("/tmp/a"), paths)
+        self.assertIn(_R("/tmp/c"), paths)
+        self.assertNotIn(_R("/tmp/b"), paths)
+
+    def test_list_stale_upstream_ttl_expired(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/tmp/a")
+            index.upsert_upstream_meta(
+                conn,
+                rid,
+                {
+                    "provider": "github",
+                    "host": "github.com",
+                    "owner": "x",
+                    "name": "y",
+                    "fetched_at": "2020-01-01T00:00:00+00:00",
+                },
+            )
+            stale = index.list_stale_upstream(
+                conn, ttl_days=7, include_never_fetched=False
+            )
+        self.assertEqual(len(stale), 1)
+
+
+class TestListRepoUpstreamFilters(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.db = os.path.join(self.tmp, "index.db")
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _add(self, conn, path, meta=None):
+        rid = index.add_repo(conn, path)
+        if meta is not None:
+            base = {"provider": "github", "host": "github.com", "owner": "x", "name": "y"}
+            base.update(meta)
+            index.upsert_upstream_meta(conn, rid, base)
+        return rid
+
+    def test_filter_upstream_archived(self):
+        with index.connect(self.db) as conn:
+            self._add(conn, "/tmp/a", {"archived": True})
+            self._add(conn, "/tmp/b", {"archived": False})
+            self._add(conn, "/tmp/c")  # no upstream row at all
+            archived = index.list_repos(conn, upstream_archived=True)
+        self.assertEqual(len(archived), 1)
+        self.assertEqual(archived[0]["path"], _R("/tmp/a"))
+
+    def test_filter_upstream_dormant(self):
+        import datetime
+
+        old = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=500)
+        ).isoformat(timespec="seconds")
+        fresh = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=30)
+        ).isoformat(timespec="seconds")
+        with index.connect(self.db) as conn:
+            self._add(conn, "/tmp/a", {"last_push": old})
+            self._add(conn, "/tmp/b", {"last_push": fresh})
+            self._add(conn, "/tmp/c")  # no upstream row
+            dormant = index.list_repos(conn, upstream_dormant_days=365)
+        self.assertEqual(len(dormant), 1)
+        self.assertEqual(dormant[0]["path"], _R("/tmp/a"))
+
+    def test_filter_upstream_stale(self):
+        import datetime
+
+        old = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=30)
+        ).isoformat(timespec="seconds")
+        with index.connect(self.db) as conn:
+            self._add(conn, "/tmp/a", {"fetched_at": old})
+            self._add(conn, "/tmp/b")  # no upstream row -> stale by default
+            self._add(
+                conn,
+                "/tmp/c",
+                {
+                    "fetched_at": datetime.datetime.now(
+                        datetime.timezone.utc
+                    ).isoformat(timespec="seconds")
+                },
+            )
+            stale = index.list_repos(conn, upstream_stale_days=7)
+        paths = {r["path"] for r in stale}
+        self.assertIn(_R("/tmp/a"), paths)
+        self.assertIn(_R("/tmp/b"), paths)
+        self.assertNotIn(_R("/tmp/c"), paths)
+
+
+class TestSchemaMigration(unittest.TestCase):
+    def test_upgrade_from_v1_to_current(self):
+        """A DB created by an earlier gitpulse (schema v1) should be
+        migrated in place on open, without data loss."""
+        with tempfile.TemporaryDirectory() as d:
+            db = os.path.join(d, "old.db")
+            # Build a v1-looking DB by running the first schema script only.
+            conn = sqlite3.connect(db)
+            conn.executescript(index._SCHEMA_V1)
+            conn.execute(
+                "INSERT INTO repos (path, added_at, status) VALUES (?, ?, ?)",
+                ("/tmp/legacy", "2020-01-01T00:00:00+00:00", "reviewed"),
+            )
+            conn.commit()
+            conn.close()
+
+            with index.connect(db) as conn:
+                version = conn.execute(
+                    "SELECT MAX(version) FROM schema_version"
+                ).fetchone()[0]
+                tables = {
+                    r["name"]
+                    for r in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )
+                }
+                rows = conn.execute("SELECT COUNT(*) FROM repos").fetchone()[0]
+        self.assertEqual(version, index.CURRENT_SCHEMA_VERSION)
+        self.assertIn("upstream_meta", tables)
+        self.assertEqual(rows, 1)
+
+
 class TestWatchlistMigration(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
