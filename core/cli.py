@@ -9,19 +9,22 @@ from .config import load_config
 def get_version() -> str:
     """Return the gitpulse version.
 
-    Prefers installed package metadata (PEP 566) so a pip-installed command
-    reports the right version; falls back to the source VERSION file for
-    direct-source runs.
+    Prefers the VERSION file at the repo root so source-tree edits are
+    reflected immediately (and stale site-packages metadata cannot shadow
+    the checked-out version). Falls back to installed package metadata
+    for pip-installed runs where the VERSION file is not present.
     """
-    try:
-        return _pkg_version("gitpulse")
-    except PackageNotFoundError:
-        pass
     version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
     try:
         with open(version_file) as f:
-            return f.read().strip()
+            value = f.read().strip()
+            if value:
+                return value
     except OSError:
+        pass
+    try:
+        return _pkg_version("gitpulse")
+    except PackageNotFoundError:
         return "unknown"
 
 

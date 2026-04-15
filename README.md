@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.0.1-orange.svg)](./VERSION)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -16,18 +16,42 @@
 
 ## Table of Contents
 
+**Getting started**
 - [Overview](#overview)
+  - [Feature highlights](#feature-highlights)
+  - [Use cases](#use-cases)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
+  - [Requirements](#requirements)
+  - [Verifying the install](#verifying-the-install)
+
+**Using gitpulse**
 - [Usage](#usage)
+  - [CLI reference](#cli-reference)
+  - [Examples](#examples)
 - [Configuration](#configuration)
+  - [Environment variables](#environment-variables)
+  - [Precedence](#precedence-highest-to-lowest)
 - [Watchlist](#watchlist)
 - [Output](#output)
+  - [Human-readable](#human-readable)
+  - [JSON](#json)
+
+**Operations & security**
 - [CI / Automation Integration](#ci--automation-integration)
+  - [Exit codes](#exit-codes)
+  - [GitHub Actions example](#github-actions-example)
+  - [Cron example](#cron-example)
 - [Logging](#logging)
 - [Security](#security)
+  - [Reporting vulnerabilities](#reporting-vulnerabilities)
+
+**Reference & project**
 - [Compatibility](#compatibility)
 - [Architecture](#architecture)
+  - [Module layout](#module-layout)
+  - [Module dependencies](#module-dependencies)
+  - [Run flow](#run-flow)
 - [Versioning & Support](#versioning--support)
 - [Contributing](#contributing)
 - [License](#license)
