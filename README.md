@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.2.0-orange.svg)](./VERSION)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -37,6 +37,12 @@
   - [Security properties](#security-properties)
   - [Recommended intake workflow](#recommended-intake-workflow)
   - [Migration from the legacy watchlist](#migration-from-the-legacy-watchlist)
+- [Upstream probes](#upstream-probes)
+  - [Supported providers](#supported-providers)
+  - [Auth config: ~/.config/gitpulse/auth.toml](#auth-config-configgitpulseauthtoml)
+  - [Commands](#commands)
+  - [Probe flow](#probe-flow)
+  - [Opsec invariants](#opsec-invariants)
 - [Output](#output)
   - [Human-readable](#human-readable)
   - [JSON](#json)
@@ -64,16 +70,20 @@
 
 ## Overview
 
-gitpulse is two tools in one:
+gitpulse is three tools in one:
 
 1. A **batch-pull engine** that walks a directory tree (and/or the metadata index), discovers every git repository it can reach, and updates them concurrently. Predictable in batch: repositories with uncommitted changes, detached HEADs, or missing upstreams are reported and skipped, never overwritten. Hung operations are terminated on a configurable timeout, and every run leaves a timestamped log behind for audit.
 2. A **metadata index** (SQLite) that records identity, provenance, tags, notes, and triage status for every repository in the fleet. Designed for teams that ingest many new GitHub projects each week and need to stay on top of what they have, where it came from, and what still matters.
+3. An **upstream probe layer** that queries GitHub, GitLab, and Gitea (hosted or self-hosted) for health signals - archived status, last push, latest release, license, stars - with **strict fail-closed opsec**: only configured hosts are ever contacted, per-repo `quiet` flags suppress any network call about that repo, and `--offline` hard-disables the network layer.
 
 ### Feature Highlights
 
 | Capability | Summary |
 | --- | --- |
 | **Metadata index** | SQLite at `$XDG_DATA_HOME/gitpulse/index.db` (0600, WAL, secure_delete). One row per repo plus tags, notes, provenance, triage status. |
+| **Upstream probes** | `gitpulse refresh` fetches archived / stars / last push / latest release for GitHub, GitLab, Gitea (hosted + self-hosted). Opsec-gated by `~/.config/gitpulse/auth.toml`; unconfigured hosts are never contacted. |
+| **Supply-chain early warning** | `gitpulse list --upstream-archived` surfaces tools whose upstream has been archived (ownership change, takedown). |
+| **Staleness view** | `gitpulse list --upstream-dormant 365` lists upstreams with no push in a year; `--upstream-stale 30` finds entries whose local cache is behind. |
 | **Ingest workflow** | `gitpulse add <url>` clones (hardened) and records source, tags, note, status in one step. |
 | **Triage queue** | `gitpulse triage` walks newly-added repos and classifies them interactively. |
 | **Fleet search** | `gitpulse list --tag c2 --untouched-over 90` answers operational questions in milliseconds. |
@@ -86,7 +96,7 @@ gitpulse is two tools in one:
 | **Exclude patterns** | `--exclude 'archived-*' 'vendor-*'` - glob-based filtering. |
 | **Timeout protection** | Kills hung git operations after N seconds. |
 | **Config file** | Persistent defaults in `~/.gitpulserc`; CLI flags always override. |
-| **JSON output** | Stable machine-readable schema on every list / show / pull command. |
+| **JSON output** | Stable machine-readable schema on every list / show / pull / refresh command. |
 | **Graceful interruption** | Ctrl+C cancels pending work and prints a partial summary. |
 | **Hardened logging** | Timestamped, rotated logs (0600 perms); credentials stripped from output. |
 | **Deterministic exit codes** | `0` on success, `1` on any failure - safe for CI and cron. |
@@ -179,10 +189,11 @@ gitpulse [verb] [options]
 | `pull` (default) | Batch-update discovered repositories. |
 | `add` | Ingest a local path or remote URL into the metadata index. |
 | `list` | Filter and print the repo fleet. |
-| `show` | Print full metadata (identity, tags, notes, git state) for one repo. |
+| `show` | Print full metadata (identity, tags, notes, git state, upstream) for one repo. |
 | `tag` | Add or remove tags on a repo. |
 | `note` | Append a timestamped note to a repo. |
 | `triage` | Walk newly-added repos interactively and classify them. |
+| `refresh` | Fetch upstream metadata (stars, archived, last push, release). Opsec-gated. |
 | `rm` | Remove a repo from the index (optionally `--purge` the clone). |
 
 ### CLI reference
@@ -366,6 +377,133 @@ Supported URL schemes for `gitpulse add`: `https://`, `http://`, `git@host:user/
 
 ---
 
+## Upstream probes
+
+`gitpulse refresh` populates a cached snapshot of each repo's **upstream** health into the index: stars, forks, open issues, archived status, default branch, license, last push, latest release. The snapshot lives next to the repo row in the `upstream_meta` table and has a configurable TTL (default 7 days).
+
+Everything here is **opt-in and fail-closed by default**. A fresh install with no `auth.toml` issues zero outbound calls; `refresh` simply reports that every repo was skipped because its host is not authorised. That is the correct behaviour - gitpulse will never enumerate your full toolchain to a third party it has not been explicitly told about.
+
+### Supported providers
+
+| Provider | Hosted | Self-hosted | API base |
+| --- | --- | --- | --- |
+| GitHub | `github.com` | GHE (Enterprise) | `/api/v3` on GHE |
+| GitLab | `gitlab.com` | any host | `/api/v4` |
+| Gitea | - | any host | `/api/v1` |
+
+For `github.com` and `gitlab.com` the provider is inferred. For every other host you must set `provider = "github"` / `"gitlab"` / `"gitea"` explicitly in `auth.toml`; gitpulse never guesses.
+
+### Auth config: `~/.config/gitpulse/auth.toml`
+
+Created automatically under `0700` inside `$XDG_CONFIG_HOME/gitpulse/`. The file itself **must** be `0600` and owned by the invoking user; otherwise gitpulse refuses to read it.
+
+```toml
+[hosts."github.com"]
+token_env = "GITHUB_TOKEN"          # preferred: source from env var
+
+[hosts."gitlab.com"]
+token_env = "GITLAB_TOKEN"
+
+[hosts."git.internal.corp"]
+provider  = "gitlab"                # required for non-standard hosts
+token_env = "CORP_GITLAB_TOKEN"
+
+[hosts."gitea.lab.local"]
+provider  = "gitea"
+token_env = "HOMELAB_GITEA_TOKEN"
+
+[defaults]
+allow_unknown = false               # keep fail-closed; true lets unconfigured
+                                    # hosts be probed unauthenticated
+```
+
+- `token_env` is always preferred over inline `token`. A token rotates with the environment and never ends up in the file.
+- Unknown hosts are skipped unconditionally unless `defaults.allow_unknown = true`.
+- Tokens are sent as `Authorization: Bearer <token>` and are **never** logged or included in error messages (verified by test).
+
+### Commands
+
+```bash
+# Default: refresh stale (>7d) cache entries for configured hosts only
+gitpulse refresh
+
+# Refresh every registered repo regardless of cache age
+gitpulse refresh --all
+
+# Refresh one repo
+gitpulse refresh --repo ~/tools/recon-kit
+
+# Change the TTL window
+gitpulse refresh --since 30
+
+# Hard kill switch - zero network traffic, prints what would be refreshed
+gitpulse refresh --offline
+
+# JSON summary for scripting
+gitpulse refresh --json
+```
+
+### Probe flow
+
+```mermaid
+flowchart TD
+    start([gitpulse refresh]) --> auth[Load auth.toml<br/>enforce 0600 perms]
+    auth --> pick{Target set}
+    pick -->|--repo R| one[Single repo]
+    pick -->|--all| everyone[All repos]
+    pick -->|default| stale[Stale only<br/>cache older than --since]
+    one --> loop
+    everyone --> loop
+    stale --> loop
+    loop[For each target] --> q{quiet=1?}
+    q -->|yes| skip1[Skip silently<br/>no network, no log]
+    q -->|no| parse[Parse remote URL<br/>-> host / owner / name]
+    parse --> host{host in auth.toml?}
+    host -->|no| skip2[Skip silently<br/>fail-closed]
+    host -->|yes| offline{--offline?}
+    offline -->|yes| skip3[Log 'would refresh'<br/>no network]
+    offline -->|no| probe[Provider API call<br/>GitHub / GitLab / Gitea]
+    probe --> ok{success?}
+    ok -->|yes| write[Upsert upstream_meta]
+    ok -->|no| err[Record fetch_error<br/>in upstream_meta]
+    skip1 --> next[next target]
+    skip2 --> next
+    skip3 --> next
+    write --> next
+    err --> next
+    next --> loop
+```
+
+### Operational questions you can answer now
+
+```bash
+# What did upstream archive recently?
+gitpulse refresh --all --json | jq -r '.errors[] | .path'   # errors first
+gitpulse list --upstream-archived
+
+# Which of my tools upstream has been dormant for more than a year?
+gitpulse list --upstream-dormant 365
+
+# What's in my index but has never been probed?
+gitpulse list --upstream-stale 0
+
+# Check one tool's full state (local + upstream) at a glance
+gitpulse show org/name
+```
+
+### Opsec invariants
+
+Stated precisely because these are load-bearing for red-team use:
+
+1. A host that does **not** appear in `auth.toml` is never contacted (unless `allow_unknown = true`).
+2. A repo with `quiet = 1` is never probed, never logged at info level.
+3. `--offline` produces zero outbound traffic and never fails open if the flag is misread.
+4. Tokens live in environment variables by default; when inline, they are still excluded from every log path (`ProbeError.args` and `__str__` both verified by test).
+5. The auth file is rejected if its permissions are not `0600` or if it is not owned by the invoking user on Unix.
+6. No aggregate metrics, telemetry, or third-party analytics. The only network traffic leaves the machine towards the providers you have explicitly authenticated.
+
+---
+
 ## Output
 
 ### Human-readable
@@ -477,7 +615,11 @@ gitpulse treats git operations on untrusted working directories as an attack sur
 | **Symlink protection** | The `logs/` directory is rejected if it is a symlink. |
 | **No shell injection** | Every subprocess call uses list arguments; `shell=True` is never used. |
 | **Index hardening** | SQLite PRAGMAs `journal_mode=WAL`, `secure_delete=ON`, `foreign_keys=ON` applied on every connection. Deleted rows are overwritten on disk. |
-| **No network by default** | Phase 1 issues zero outbound connections. Upstream probes arriving in Phase 2 will be opt-in globally and opt-out per repo (`--quiet-upstream`). |
+| **Probe fail-closed** | Upstream probes only contact hosts listed in `~/.config/gitpulse/auth.toml`; unknown hosts are silently skipped unless `defaults.allow_unknown = true`. |
+| **Per-repo quiet flag** | `gitpulse add --quiet-upstream` marks a repo as ineligible for upstream probes. The probe layer never queries or logs these repos. |
+| **Offline kill switch** | `refresh --offline` hard-disables the network layer; no exception paths, no fail-open. |
+| **Token hygiene** | Tokens are sourced from environment variables by default (`token_env`), passed as `Authorization: Bearer`, and redacted from every log and error path. |
+| **Auth file perms** | `auth.toml` is rejected on load if its mode is not `0600` or the owner is not the invoking user (Unix). |
 
 ### At-rest confidentiality
 

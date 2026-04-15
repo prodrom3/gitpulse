@@ -26,7 +26,7 @@ VALID_STATUSES: frozenset[str] = frozenset(
     {"new", "reviewed", "in-use", "dropped", "flagged"}
 )
 
-CURRENT_SCHEMA_VERSION: int = 1
+CURRENT_SCHEMA_VERSION: int = 2
 
 _SCHEMA_V1: str = """
 CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
@@ -67,6 +67,36 @@ CREATE TABLE notes (
 CREATE INDEX idx_notes_repo_id ON notes(repo_id);
 """
 
+# v2 adds the upstream_meta table. Each row is 1:1 with a repo row and
+# caches the most recent successful probe of the upstream host. fetched_at
+# is the TTL anchor. fetch_error holds a short message when the probe
+# failed, so operators can see why a refresh did not populate fields.
+_MIGRATION_V1_TO_V2: str = """
+CREATE TABLE upstream_meta (
+    repo_id          INTEGER PRIMARY KEY REFERENCES repos(id) ON DELETE CASCADE,
+    provider         TEXT NOT NULL,
+    host             TEXT NOT NULL,
+    owner            TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    description      TEXT,
+    stars            INTEGER,
+    forks            INTEGER,
+    open_issues      INTEGER,
+    archived         INTEGER NOT NULL DEFAULT 0,
+    default_branch   TEXT,
+    license          TEXT,
+    last_push        TEXT,
+    latest_release   TEXT,
+    fetched_at       TEXT NOT NULL,
+    fetch_error      TEXT
+);
+CREATE INDEX idx_upstream_archived ON upstream_meta(archived);
+CREATE INDEX idx_upstream_fetched  ON upstream_meta(fetched_at);
+CREATE INDEX idx_upstream_last_push ON upstream_meta(last_push);
+
+INSERT INTO schema_version VALUES (2);
+"""
+
 
 # ---------- connection / schema ----------
 
@@ -100,16 +130,18 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     version = _current_schema_version(conn)
     if version == CURRENT_SCHEMA_VERSION:
         return
-    if version == 0:
-        conn.executescript(_SCHEMA_V1)
-        conn.commit()
-        return
     if version > CURRENT_SCHEMA_VERSION:
         raise RuntimeError(
             f"index.db schema version {version} is newer than this gitpulse "
             f"release supports ({CURRENT_SCHEMA_VERSION}). Upgrade gitpulse."
         )
-    # Future migrations would go here: 1 -> 2 -> 3 ...
+    if version == 0:
+        conn.executescript(_SCHEMA_V1)
+        version = 1
+    if version == 1:
+        conn.executescript(_MIGRATION_V1_TO_V2)
+        version = 2
+    conn.commit()
 
 
 @contextmanager
@@ -236,8 +268,20 @@ def list_repos(
     tag: str | None = None,
     status: str | None = None,
     untouched_days: int | None = None,
+    upstream_archived: bool = False,
+    upstream_dormant_days: int | None = None,
+    upstream_stale_days: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Return repos matching the given filters, newest-added first."""
+    """Return repos matching the given filters, newest-added first.
+
+    Upstream filters implicitly LEFT JOIN upstream_meta:
+    - upstream_archived: only repos whose upstream row has archived=1.
+    - upstream_dormant_days: upstream last_push older than N days
+      (NULL last_push is excluded; we can't call a repo with no known
+      push date "dormant" without guessing).
+    - upstream_stale_days: upstream cache older than N days OR missing
+      (never fetched).
+    """
     where: list[str] = []
     params: list[Any] = []
 
@@ -263,7 +307,24 @@ def list_repos(
         where.append("(r.last_touched_at IS NULL OR r.last_touched_at < ?)")
         params.append(cutoff_iso)
 
-    sql = "SELECT r.* FROM repos r"
+    if upstream_archived:
+        where.append("u.archived = 1")
+
+    if upstream_dormant_days is not None:
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            days=upstream_dormant_days
+        )
+        where.append("u.last_push IS NOT NULL AND u.last_push < ?")
+        params.append(cutoff.isoformat(timespec="seconds"))
+
+    if upstream_stale_days is not None:
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            days=upstream_stale_days
+        )
+        where.append("(u.fetched_at IS NULL OR u.fetched_at < ?)")
+        params.append(cutoff.isoformat(timespec="seconds"))
+
+    sql = "SELECT r.* FROM repos r LEFT JOIN upstream_meta u ON u.repo_id = r.id"
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY r.added_at DESC, r.id DESC"
@@ -447,6 +508,111 @@ def get_notes(
         (repo_id,),
     ).fetchall()
     return [_row_to_dict(row) for row in rows]
+
+
+# ---------- upstream metadata ----------
+
+_UPSTREAM_COLUMNS = (
+    "repo_id",
+    "provider",
+    "host",
+    "owner",
+    "name",
+    "description",
+    "stars",
+    "forks",
+    "open_issues",
+    "archived",
+    "default_branch",
+    "license",
+    "last_push",
+    "latest_release",
+    "fetched_at",
+    "fetch_error",
+)
+
+
+def upsert_upstream_meta(
+    conn: sqlite3.Connection,
+    selector: str | int,
+    meta: dict[str, Any],
+) -> bool:
+    """Insert or replace the upstream metadata row for the given repo.
+
+    `meta` keys beyond the schema are silently ignored. `fetched_at`
+    is set to now() if missing. `archived` is coerced to 0/1. When
+    `fetch_error` is set, the caller should either omit the other
+    fields or pass partial data captured before the failure.
+    """
+    repo_id = _resolve_repo_id(conn, selector)
+    if repo_id is None:
+        return False
+
+    row: dict[str, Any] = {col: meta.get(col) for col in _UPSTREAM_COLUMNS}
+    row["repo_id"] = repo_id
+    row["fetched_at"] = meta.get("fetched_at") or _now_utc()
+    row["archived"] = 1 if meta.get("archived") else 0
+
+    cols = ", ".join(_UPSTREAM_COLUMNS)
+    placeholders = ", ".join(["?"] * len(_UPSTREAM_COLUMNS))
+    conn.execute(
+        f"INSERT OR REPLACE INTO upstream_meta ({cols}) VALUES ({placeholders})",
+        tuple(row[col] for col in _UPSTREAM_COLUMNS),
+    )
+    conn.commit()
+    return True
+
+
+def get_upstream_meta(
+    conn: sqlite3.Connection, selector: str | int
+) -> dict[str, Any] | None:
+    repo_id = _resolve_repo_id(conn, selector)
+    if repo_id is None:
+        return None
+    row = conn.execute(
+        "SELECT * FROM upstream_meta WHERE repo_id = ?", (repo_id,)
+    ).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def list_stale_upstream(
+    conn: sqlite3.Connection,
+    ttl_days: int = 7,
+    *,
+    include_never_fetched: bool = True,
+) -> list[dict[str, Any]]:
+    """Return repos whose upstream_meta is missing or older than ttl_days.
+
+    `include_never_fetched` defaults to True so a fresh index produces
+    a useful first-run refresh batch. Set to False when you only want
+    cache-expired entries.
+    """
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        days=ttl_days
+    )
+    cutoff_iso = cutoff.isoformat(timespec="seconds")
+
+    if include_never_fetched:
+        sql = """
+            SELECT r.* FROM repos r
+            LEFT JOIN upstream_meta u ON u.repo_id = r.id
+            WHERE u.fetched_at IS NULL OR u.fetched_at < ?
+            ORDER BY r.added_at DESC, r.id DESC
+        """
+    else:
+        sql = """
+            SELECT r.* FROM repos r
+            JOIN upstream_meta u ON u.repo_id = r.id
+            WHERE u.fetched_at < ?
+            ORDER BY r.added_at DESC, r.id DESC
+        """
+    rows = conn.execute(sql, (cutoff_iso,)).fetchall()
+    result = []
+    for row in rows:
+        repo = _row_to_dict(row)
+        repo["tags"] = _get_tags_for_repo(conn, int(row["id"]))
+        result.append(repo)
+    return result
 
 
 # ---------- migration from legacy watchlist ----------
