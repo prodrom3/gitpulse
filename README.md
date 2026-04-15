@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.2.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.3.0-orange.svg)](./VERSION)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -43,6 +43,11 @@
   - [Commands](#commands)
   - [Probe flow](#probe-flow)
   - [Opsec invariants](#opsec-invariants)
+- [Weekly digest](#weekly-digest)
+- [Obsidian vault export](#obsidian-vault-export)
+  - [Configure the vault path](#configure-the-vault-path)
+  - [What gets written](#what-gets-written)
+  - [One-way, by design](#one-way-by-design)
 - [Output](#output)
   - [Human-readable](#human-readable)
   - [JSON](#json)
@@ -194,6 +199,8 @@ gitpulse [verb] [options]
 | `note` | Append a timestamped note to a repo. |
 | `triage` | Walk newly-added repos interactively and classify them. |
 | `refresh` | Fetch upstream metadata (stars, archived, last push, release). Opsec-gated. |
+| `digest` | Weekly changeset report over the local index (zero network). |
+| `vault export` | Render the index into an Obsidian vault (one-way markdown). |
 | `rm` | Remove a repo from the index (optionally `--purge` the clone). |
 
 ### CLI reference
@@ -501,6 +508,115 @@ Stated precisely because these are load-bearing for red-team use:
 4. Tokens live in environment variables by default; when inline, they are still excluded from every log path (`ProbeError.args` and `__str__` both verified by test).
 5. The auth file is rejected if its permissions are not `0600` or if it is not owned by the invoking user on Unix.
 6. No aggregate metrics, telemetry, or third-party analytics. The only network traffic leaves the machine towards the providers you have explicitly authenticated.
+
+---
+
+## Weekly digest
+
+`gitpulse digest` produces a read-only, zero-network changeset report over the metadata index. Run it on Monday mornings to see what moved in your fleet, what needs attention, and what supply-chain flags are still outstanding.
+
+```bash
+gitpulse digest                     # 7-day window, 90d stale, 365d dormant
+gitpulse digest --since 14          # widen the window
+gitpulse digest --json | jq .       # machine-readable for dashboards
+gitpulse digest --json | jq '.counts'
+```
+
+The report always includes these sections (fixed-shape JSON with `schema: 1`):
+
+| Section | What it contains |
+| --- | --- |
+| `counts` | Total repo count and per-status breakdown. |
+| `added` | Repos ingested within `--since DAYS`. Path, tags, source. |
+| `refreshed` | Repos whose upstream cache was refreshed within the window. Path, archived flag, last push, latest release. |
+| `archived` | All repos currently flagged as archived upstream. Always surfaced until the operator acts on it (supply-chain signal). |
+| `flagged` | All repos with `status = 'flagged'`. |
+| `stale_local` | Repos with `last_touched_at` older than `--stale DAYS` (or `NULL`). |
+| `dormant` | Repos whose upstream had no push in `--dormant DAYS`. |
+
+Pipe the JSON output into a Slack webhook, Grafana Loki, a ticketing system, or a cron-triggered Monday email - the schema is stable.
+
+---
+
+## Obsidian vault export
+
+`gitpulse vault export` writes one markdown file per repo into an Obsidian vault, with YAML frontmatter that Obsidian renders as native Properties (tags become clickable, upstream fields become dataview-queryable). This turns your fleet into a browsable, searchable knowledge base without running a separate database.
+
+### Configure the vault path
+
+Add the vault to `~/.gitpulserc`:
+
+```ini
+[vault]
+path   = /home/user/obsidian/red-team
+subdir = repos
+```
+
+Or override per-run: `gitpulse vault export --path ~/obsidian/red-team --subdir tools`.
+
+### What gets written
+
+Each repo produces `<vault>/<subdir>/<slug>.md` where `slug` is `<owner>-<name>` from the upstream metadata (or the repo path's basename when there is no upstream record). Example frontmatter:
+
+```yaml
+---
+gitpulse_id: 42
+path: "/home/user/tools/recon-kit"
+remote_url: "git@github.com:org/recon-kit.git"
+source: "blog:orange.tw, 2026-04-12"
+status: "in-use"
+quiet: false
+added: "2026-04-12T10:00:00+00:00"
+last_touched: "2026-04-15T14:00:00+00:00"
+tags: ["recon", "passive"]
+upstream:
+  provider: "github"
+  host: "github.com"
+  owner: "org"
+  name: "recon-kit"
+  stars: 1243
+  archived: false
+  default_branch: "main"
+  last_push: "2026-04-11T00:00:00Z"
+  latest_release: "v2.3.1"
+  license: "MIT"
+  fetched_at: "2026-04-15T13:00:00+00:00"
+---
+
+# org/recon-kit
+
+*Exported by gitpulse 2.3.0 on 2026-04-15T14:10:00+00:00*
+
+## Description
+
+(upstream description here)
+
+## Notes
+
+- **2026-04-12T10:05:00+00:00** - "mentioned for OOB DNS recon"
+- **2026-04-14T09:30:00+00:00** - "used in demo"
+```
+
+### One-way, by design
+
+The vault is a **view**; the index DB is the source of truth. Every `vault export` run rewrites each `.md` atomically (temp-file + rename). Anything you edit in Obsidian is overwritten on the next export. This is intentional - it keeps the model unambiguous and avoids the merge-conflict surface of a two-way sync. Two-way sync (parsing your Obsidian edits back into the index) is a deliberately deferred future phase.
+
+Note: the vault contains the same sensitive operator context as the index (tags, sources, notes, upstream metadata). Treat the vault directory with the same opsec posture as `$XDG_DATA_HOME/gitpulse/`: files are written `0600` and the `repos` subdirectory is created `0700` on Unix; keep the vault on an encrypted volume at rest.
+
+### Dataview queries once you have exported
+
+```
+TABLE status, upstream.stars, upstream.archived, upstream.last_push
+FROM "repos"
+WHERE contains(tags, "c2") AND !upstream.archived
+SORT upstream.stars DESC
+```
+
+```
+TABLE status, upstream.last_push
+FROM "repos"
+WHERE upstream.archived = true
+```
 
 ---
 
