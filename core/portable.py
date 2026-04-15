@@ -101,13 +101,18 @@ def _apply_remaps(path: str, remaps: list[tuple[str, str]]) -> str:
     """Rewrite `path` if it starts with any remap src prefix.
 
     Remaps are tried in order; the first matching prefix wins. A
-    trailing slash on `src` is tolerated either way so operators do
-    not trip over `--remap /a/:/b` vs `--remap /a:/b`.
+    trailing slash or backslash on `src` is tolerated so operators do
+    not trip over `--remap /a/:/b` vs `--remap /a:/b`. Both path
+    separators are accepted for the match so a bundle produced on
+    Windows (backslashes) can be remapped on Unix and vice versa.
     """
     for src, dst in remaps:
-        src_norm = src.rstrip("/")
-        if path == src_norm or path.startswith(src_norm + "/"):
-            return dst.rstrip("/") + path[len(src_norm):]
+        src_norm = src.rstrip("/\\")
+        dst_norm = dst.rstrip("/\\")
+        if path == src_norm:
+            return dst_norm
+        if path.startswith(src_norm + "/") or path.startswith(src_norm + "\\"):
+            return dst_norm + path[len(src_norm):]
     return path
 
 

@@ -128,6 +128,18 @@ class TestRemap(unittest.TestCase):
             "/b",
         )
 
+    def test_accepts_backslash_separator(self):
+        # A bundle made on Windows carries backslashed paths; the remap
+        # match must still work if the operator passes the src as the
+        # Windows-style path.
+        self.assertEqual(
+            portable._apply_remaps(
+                r"C:\Users\alice\tools\r",
+                [(r"C:\Users\alice", r"D:\bob")],
+            ),
+            r"D:\bob\tools\r",
+        )
+
 
 class TestParseRemap(unittest.TestCase):
     def test_valid(self):
