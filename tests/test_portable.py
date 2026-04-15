@@ -215,8 +215,17 @@ class TestImportBundle(_IndexTestCase):
         self.assertEqual(paths, {_R("/tmp/keep")})
 
     def test_remap_rewrites_paths(self):
+        # Use canonical (realpath'd) tmp roots so the remap source prefix
+        # matches what add_repo actually stores. Using '/home/...' breaks
+        # on macOS (/home -> /System/Volumes/Data/home) and on Windows
+        # (POSIX-style paths get resolved to a drive root).
+        alice_root = os.path.realpath(os.path.join(self.tmp, "alice-root"))
+        bob_root = os.path.realpath(os.path.join(self.tmp, "bob-root"))
+        alice_path = os.path.join(alice_root, "tools", "r")
+        expected = os.path.join(bob_root, "tools", "r")
+
         with index.connect(self.db) as conn:
-            index.add_repo(conn, "/home/alice/tools/r")
+            index.add_repo(conn, alice_path)
             bundle = portable.build_bundle(conn)
         other_db = os.path.join(self.tmp, "other.db")
         with index.connect(other_db) as conn:
@@ -224,11 +233,11 @@ class TestImportBundle(_IndexTestCase):
                 conn,
                 bundle,
                 mode="merge",
-                remaps=[("/home/alice", "/home/bob")],
+                remaps=[(alice_root, bob_root)],
             )
             repos = index.list_repos(conn)
         self.assertEqual(len(repos), 1)
-        self.assertEqual(repos[0]["path"], _R("/home/bob/tools/r"))
+        self.assertEqual(repos[0]["path"], expected)
 
     def test_dry_run_does_not_write(self):
         with index.connect(self.db) as conn:
