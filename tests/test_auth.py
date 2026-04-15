@@ -4,7 +4,14 @@ import tempfile
 import unittest
 from unittest import mock
 
+from core import auth as _auth_mod
 from core.auth import AuthConfig, _is_auth_file_safe, load_auth
+
+_NEEDS_TOML = unittest.skipIf(
+    _auth_mod._toml is None,
+    "no TOML parser available (Python 3.10 without tomli); auth.toml "
+    "loading is fail-closed by design in this environment",
+)
 
 
 def _write(tmp: str, body: str, mode: int = 0o600) -> str:
@@ -85,6 +92,7 @@ class TestLoadAuth(unittest.TestCase):
         self.assertEqual(cfg.hosts, {})
         self.assertFalse(cfg.allow_unknown)
 
+    @_NEEDS_TOML
     def test_parses_full_config(self):
         body = """
 [hosts."github.com"]
@@ -121,6 +129,7 @@ allow_unknown = true
         cfg = load_auth(path)
         self.assertEqual(cfg.hosts, {})
 
+    @_NEEDS_TOML
     @unittest.skipIf(sys.platform == "win32", "Unix-only perm check")
     def test_accepts_0600(self):
         path = _write(self.tmp, '[hosts."github.com"]\n', mode=0o600)
