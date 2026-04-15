@@ -17,11 +17,6 @@ import unittest
 from unittest import mock
 
 from core import index
-
-
-def _R(path: str) -> str:
-    """Canonicalise a path exactly like core.index._normalize_path."""
-    return os.path.realpath(os.path.expanduser(path))
 from core.commands import add as cmd_add
 from core.commands import list_cmd as cmd_list
 from core.commands import note as cmd_note
@@ -29,6 +24,11 @@ from core.commands import rm as cmd_rm
 from core.commands import show as cmd_show
 from core.commands import tag as cmd_tag
 from core.commands import triage as cmd_triage
+
+
+def _R(path: str) -> str:
+    """Canonicalise a path exactly like core.index._normalize_path."""
+    return os.path.realpath(os.path.expanduser(path))
 
 
 class _IndexTestCase(unittest.TestCase):
