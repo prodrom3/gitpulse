@@ -34,10 +34,21 @@ from typing import Any
 
 from .paths import auth_config_path
 
+# Python 3.11+ ships tomllib in the stdlib. On 3.10 we fall back to
+# tomli if it happens to be installed; otherwise the TOML loader is
+# disabled entirely and load_auth() returns a fail-closed config with
+# a clear warning. This keeps gitpulse importable with zero runtime
+# dependencies on every supported Python, and keeps the opsec posture
+# correct: no TOML parser means no auth.toml is read, which means
+# every upstream probe is skipped fail-closed.
+_toml: Any = None
 try:
-    import tomllib as _toml  # type: ignore[import-not-found,unused-ignore]
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as _toml  # type: ignore[import-not-found, no-redef]
+    import tomllib as _toml  # type: ignore[import-not-found,no-redef,unused-ignore]
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    try:
+        import tomli as _toml  # type: ignore[import-not-found,no-redef]
+    except ModuleNotFoundError:
+        pass
 
 
 _DEFAULT_PROVIDERS: dict[str, str] = {
@@ -123,6 +134,13 @@ def load_auth(path: str | None = None) -> AuthConfig:
     if not os.path.isfile(cfg_path):
         return AuthConfig()
     if not _is_auth_file_safe(cfg_path):
+        return AuthConfig()
+    if _toml is None:
+        logging.warning(
+            f"Ignoring {cfg_path}: no TOML parser available on this Python. "
+            f"Upgrade to Python 3.11+ (preferred) or install 'tomli' "
+            f"for 3.10. Upstream probes will fail closed until then."
+        )
         return AuthConfig()
 
     try:
