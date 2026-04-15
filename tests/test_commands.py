@@ -17,6 +17,11 @@ import unittest
 from unittest import mock
 
 from core import index
+
+
+def _R(path: str) -> str:
+    """Canonicalise a path exactly like core.index._normalize_path."""
+    return os.path.realpath(os.path.expanduser(path))
 from core.commands import add as cmd_add
 from core.commands import list_cmd as cmd_list
 from core.commands import note as cmd_note
@@ -152,7 +157,7 @@ class TestList(_IndexTestCase):
             cmd_list.run(args)
         data = json.loads(out.getvalue())
         self.assertEqual(data["total"], 1)
-        self.assertEqual(data["repositories"][0]["path"], "/t/a")
+        self.assertEqual(data["repositories"][0]["path"], _R("/t/a"))
 
     def test_list_filter_by_status(self):
         self._seed()
@@ -193,7 +198,7 @@ class TestShow(_IndexTestCase):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
             cmd_show.run(args)
         text = out.getvalue()
-        self.assertIn("/t/a", text)
+        self.assertIn(_R("/t/a"), text)
         self.assertIn("blog:x", text)
 
     def test_show_updates_last_touched(self):

@@ -8,6 +8,16 @@ import unittest
 from core import index
 
 
+def _R(path: str) -> str:
+    """Canonicalise a path the same way core.index does (realpath + expanduser).
+
+    Needed because tests use abstract paths like /tmp/a or /t/a as test IDs,
+    but the index normalises them: on macOS /tmp is a symlink to /private/tmp,
+    and on Windows a POSIX-style path resolves to a drive-rooted path.
+    """
+    return os.path.realpath(os.path.expanduser(path))
+
+
 class TestConnectAndSchema(unittest.TestCase):
     def test_creates_schema_on_first_open(self):
         with tempfile.TemporaryDirectory() as d:
@@ -112,7 +122,7 @@ class TestRepoCrud(unittest.TestCase):
             index.add_repo(conn, "/tmp/./a/../a")
             repo = index.get_repo(conn, "/tmp/a")
         self.assertIsNotNone(repo)
-        self.assertEqual(repo["path"], "/tmp/a")
+        self.assertEqual(repo["path"], _R("/tmp/a"))
 
     def test_add_existing_path_is_idempotent(self):
         with index.connect(self.db) as conn:
@@ -135,7 +145,7 @@ class TestRepoCrud(unittest.TestCase):
             c2 = index.list_repos(conn, tag="c2")
         self.assertEqual(len(both), 2)
         self.assertEqual(len(c2), 1)
-        self.assertEqual(c2[0]["path"], "/tmp/a")
+        self.assertEqual(c2[0]["path"], _R("/tmp/a"))
 
     def test_list_filters_by_status(self):
         with index.connect(self.db) as conn:
@@ -159,12 +169,12 @@ class TestRepoCrud(unittest.TestCase):
             ).isoformat(timespec="seconds")
             conn.execute(
                 "UPDATE repos SET last_touched_at = ? WHERE path = ?",
-                (old, "/tmp/b"),
+                (old, _R("/tmp/b")),
             )
             conn.commit()
             stale = index.list_repos(conn, untouched_days=90)
         paths = {r["path"] for r in stale}
-        self.assertEqual(paths, {"/tmp/a", "/tmp/b"})
+        self.assertEqual(paths, {_R("/tmp/a"), _R("/tmp/b")})
 
     def test_update_status_valid_and_invalid(self):
         with index.connect(self.db) as conn:
@@ -276,7 +286,7 @@ class TestWatchlistMigration(unittest.TestCase):
             n = index.migrate_watchlist(conn, wl)
             repos = index.list_repos(conn)
         self.assertEqual(n, 2)
-        self.assertEqual({r["path"] for r in repos}, {"/tmp/a", "/tmp/b"})
+        self.assertEqual({r["path"] for r in repos}, {_R("/tmp/a"), _R("/tmp/b")})
         self.assertTrue(all(r["source"] == "legacy-watchlist" for r in repos))
         self.assertTrue(all(r["status"] == "reviewed" for r in repos))
 
