@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.4.0-orange.svg)](./VERSION)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -48,6 +48,15 @@
   - [Configure the vault path](#configure-the-vault-path)
   - [What gets written](#what-gets-written)
   - [One-way, by design](#one-way-by-design)
+- [Portable export and import](#portable-export-and-import)
+  - [Export](#export)
+  - [Import](#import)
+  - [Bundle schema (stable)](#bundle-schema-stable)
+- [Self-update](#self-update)
+  - [Install-method detection](#install-method-detection)
+  - [Commands](#commands-1)
+  - [Behaviour per install method](#behaviour-per-install-method)
+  - [Opsec properties](#opsec-properties-1)
 - [Output](#output)
   - [Human-readable](#human-readable)
   - [JSON](#json)
@@ -201,6 +210,9 @@ gitpulse [verb] [options]
 | `refresh` | Fetch upstream metadata (stars, archived, last push, release). Opsec-gated. |
 | `digest` | Weekly changeset report over the local index (zero network). |
 | `vault export` | Render the index into an Obsidian vault (one-way markdown). |
+| `export` | Write a schema-versioned JSON bundle of the index (portable; supports redaction). |
+| `import` | Load a bundle into the index (merge by default; `--replace` wipes; `--remap` rewrites paths). |
+| `update` | Check for / apply a gitpulse self-update. Auto-detects source clone / pipx / pip. |
 | `rm` | Remove a repo from the index (optionally `--purge` the clone). |
 
 ### CLI reference
@@ -617,6 +629,143 @@ TABLE status, upstream.last_push
 FROM "repos"
 WHERE upstream.archived = true
 ```
+
+---
+
+## Portable export and import
+
+`gitpulse export` writes a schema-versioned JSON bundle of the metadata index; `gitpulse import` re-applies one. Use this for backup, cross-machine migration, team onboarding, or sharing a redacted tool inventory with a collaborator.
+
+### Export
+
+```bash
+# Stdout (default) - pipes cleanly into ssh / scp / archivers
+gitpulse export > gitpulse-$(date +%Y%m%d).json
+
+# To a file (chmod 0600 on Unix)
+gitpulse export --out /backup/gitpulse.json
+
+# Redact notes, source, and remote_url - safe to share
+gitpulse export --out share.json --redact --pretty
+```
+
+The bundle carries: `schema` (currently 1), `exported_at`, `gitpulse_version`, `redacted` flag, and a `repos[]` array. Each repo entry includes path, remote_url (null if redacted), source (null if redacted), status, quiet flag, timestamps, tags, notes (empty if redacted), and the latest `upstream` metadata snapshot.
+
+### Import
+
+```bash
+# Default: additive merge into the current index
+gitpulse import bundle.json
+
+# From stdin - end-to-end pipe between machines
+gitpulse export | ssh ops-box "gitpulse import -"
+
+# Cross-machine path rewrite (Alice's paths -> Bob's paths)
+gitpulse import bundle.json --remap /home/alice:/home/bob
+
+# Wipe-and-replace mode (privileged; requires --yes for non-interactive use)
+gitpulse import bundle.json --replace --yes
+
+# Preview without writing
+gitpulse import bundle.json --dry-run --json
+```
+
+**Merge semantics (default):**
+- Repos in the bundle that are not in the local index are **added**.
+- Repos that already exist locally keep their **status, source, and quiet flag** unchanged. Local operator decisions always win.
+- Tags are **unioned** (duplicates dropped).
+- Notes are **appended** (we cannot tell which are "new" without content hashing; append is the right default).
+- `upstream` metadata from the bundle is written as the current cached value. Run `gitpulse refresh` afterwards to rebuild it from live providers.
+
+**Replace semantics (`--replace`):**
+- Local index is **wiped** first, then the bundle is applied fresh.
+- Without `--yes` the command prompts interactively; empty / `n` aborts with exit code 1.
+- Typical use: disaster recovery, migrating to a new host, rotating workstations.
+
+### Bundle schema (stable)
+
+```json
+{
+  "schema": 1,
+  "exported_at": "2026-04-15T15:30:00+00:00",
+  "gitpulse_version": "2.4.0",
+  "redacted": false,
+  "repos": [
+    {
+      "path": "/home/user/tools/repo",
+      "remote_url": "git@github.com:org/repo.git",
+      "source": "blog:...",
+      "status": "in-use",
+      "quiet": false,
+      "added_at": "2026-04-12T10:00:00+00:00",
+      "last_touched_at": "2026-04-15T14:00:00+00:00",
+      "tags": ["recon", "passive"],
+      "notes": [{"body": "...", "created_at": "..."}],
+      "upstream": {
+        "provider": "github",
+        "host": "github.com",
+        "owner": "org",
+        "name": "repo",
+        "stars": 42,
+        "archived": false,
+        "...": "..."
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Self-update
+
+`gitpulse update` compares the running version against the latest GitHub release and - if requested - applies the upgrade for your install method.
+
+This is the only command that reaches out to `github.com` in default configuration. It is an opt-in network call triggered by the user's explicit command; `--offline` hard-disables it. The release check issues **one** HTTPS GET to `api.github.com/repos/prodrom3/gitpulse/releases/latest`; no telemetry, no aggregate reporting.
+
+### Install-method detection
+
+```mermaid
+flowchart TD
+    start([gitpulse update]) --> detect[Detect install method]
+    detect --> src{.git at install root?<br/>remote points at gitpulse?}
+    src -->|yes| source[source clone<br/>upgrade: git -C ROOT pull --ff-only]
+    src -->|no| pipx{pipx list --json has gitpulse?}
+    pipx -->|yes| pipxm[pipx install<br/>upgrade: pipx upgrade gitpulse]
+    pipx -->|no| pip[pip install<br/>upgrade command printed, never auto-run]
+```
+
+### Commands
+
+```bash
+# Report-only: is there a newer release?
+gitpulse update --check
+
+# Apply the upgrade for the auto-detected method (prompts to confirm)
+gitpulse update
+
+# Non-interactive apply (for cron / CI - use with care)
+gitpulse update --yes
+
+# Offline mode: print local state only, no network
+gitpulse update --offline
+```
+
+### Behaviour per install method
+
+| Install | `gitpulse update` does | Notes |
+| --- | --- | --- |
+| Source clone | `git -C <root> pull --ff-only` | Fast-forward only; any local commits block the upgrade explicitly. |
+| pipx | `pipx upgrade gitpulse` | Standard pipx venv upgrade. |
+| pip | Prints the recommended `pip install --upgrade ...` command | Never invoked automatically; the right invocation depends on `--user`, venv, or system-wide state, and often needs sudo. |
+
+### Opsec properties
+
+- `--offline` produces zero outbound traffic.
+- Token is read from `GITHUB_TOKEN` when set; otherwise the call is unauthenticated (60 req/hour, plenty for interactive use).
+- Tokens are never logged or included in error messages.
+- No `shell=True` in the upgrade subprocess calls; arguments are always passed as a list.
+- A non-zero return code from the upgrade surfaces as an `UpdateError` with the subprocess output; the command exits 1 and the operator can re-run manually.
 
 ---
 
