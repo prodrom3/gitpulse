@@ -51,6 +51,10 @@ def load_config() -> dict[str, Any]:
 
         [exclude]
         patterns = archived-*, .backup-*
+
+        [vault]
+        path   = /home/user/obsidian-vault
+        subdir = repos
     """
     config_path = get_config_path()
     result: dict[str, Any] = {
@@ -61,6 +65,8 @@ def load_config() -> dict[str, Any]:
         "rebase": False,
         "exclude_patterns": [],
         "clone_dir": None,
+        "vault_path": None,
+        "vault_subdir": "repos",
     }
 
     if not os.path.isfile(config_path):
@@ -87,5 +93,13 @@ def load_config() -> dict[str, Any]:
         raw = parser.get("exclude", "patterns", fallback="")
         patterns = [p.strip() for p in raw.split(",") if p.strip()]
         result["exclude_patterns"] = patterns
+
+    if parser.has_section("vault"):
+        vault_path = parser.get("vault", "path", fallback="").strip()
+        if vault_path:
+            result["vault_path"] = os.path.expanduser(vault_path)
+        subdir = parser.get("vault", "subdir", fallback="").strip()
+        if subdir:
+            result["vault_subdir"] = subdir
 
     return result
