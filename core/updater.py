@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Optional
 
 from .config import DEFAULT_TIMEOUT
 from .models import RepoResult, RepoStatus

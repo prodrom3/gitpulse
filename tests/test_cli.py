@@ -1,4 +1,3 @@
-import os
 import tempfile
 import unittest
 from unittest import mock
@@ -12,7 +11,10 @@ class TestGetVersion(unittest.TestCase):
         self.assertRegex(version, r"^\d+\.\d+\.\d+$")
 
     def test_returns_unknown_on_missing_file(self):
-        with mock.patch("builtins.open", side_effect=OSError("not found")):
+        from importlib.metadata import PackageNotFoundError
+
+        with mock.patch("core.cli._pkg_version", side_effect=PackageNotFoundError("gitpulse")), \
+             mock.patch("builtins.open", side_effect=OSError("not found")):
             version = get_version()
         self.assertEqual(version, "unknown")
 

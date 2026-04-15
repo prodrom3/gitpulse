@@ -2,7 +2,7 @@ import fnmatch
 import logging
 import os
 import sys
-from typing import Generator
+from collections.abc import Generator
 
 from .config import DEFAULT_DEPTH
 
@@ -48,7 +48,7 @@ def discover_repositories(
 
     root_depth = root_directory.rstrip(os.sep).count(os.sep)
 
-    for root, dirs, files in os.walk(root_directory):
+    for root, dirs, _files in os.walk(root_directory):
         current_depth = root.rstrip(os.sep).count(os.sep) - root_depth
         if current_depth >= max_depth:
             dirs.clear()

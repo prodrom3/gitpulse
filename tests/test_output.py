@@ -1,10 +1,16 @@
-import json
 import io
+import json
 import unittest
 from unittest import mock
 
 from core.models import RepoResult, RepoStatus
-from core.output import Color, _supports_color, print_human_summary, print_json_summary, print_progress
+from core.output import (
+    Color,
+    _supports_color,
+    print_human_summary,
+    print_json_summary,
+    print_progress,
+)
 
 
 class TestColor(unittest.TestCase):

@@ -2,47 +2,98 @@
 
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](https://github.com/prodrom3/gitpulse/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](./VERSION)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
-`gitpulse` is a Python CLI tool that batch-updates multiple git repositories in parallel. It scans a directory tree, discovers all git repositories, and pulls updates concurrently - keeping dozens of cloned repos in sync with a single command.
-
-**Author:** [prodrom3](https://github.com/prodrom3) / [radamic](https://github.com/radamic) | **Last updated:** 2026-04-02
+> **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
 
 <p align="center">
-  <img width="460" height="460" src="https://github.com/prodrom3/gitpulse/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d">
+  <img width="420" height="420" src="https://github.com/prodrom3/gitpulse/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d" alt="gitpulse logo">
 </p>
 
-## Features
+---
 
-- **Parallel updates** - Uses multi-threading to pull repositories concurrently, with configurable worker count
-- **Smart detection** - Skips repos that are already up-to-date, have uncommitted changes, detached HEAD, or no upstream branch
-- **Watchlist** - Maintain a persistent list of repos to track, even across different directories
-- **Fetch-only mode** - Check what's new across all repos without merging anything
-- **Producer/consumer** - Starts pulling repos while still discovering more, so the first results come back faster
-- **SSH multiplexing** - Reuses SSH connections across repos sharing the same remote host (Unix)
-- **Dry-run mode** - Preview which repositories will be updated before pulling
-- **Rebase support** - Optionally use `git pull --rebase` instead of merge
-- **Exclude patterns** - Skip specific repos by glob pattern (e.g. `--exclude 'archived-*'`)
-- **Configurable depth** - Control how deep the directory scan goes
-- **Timeout protection** - Kills hung git operations after a configurable timeout
-- **Config file** - Set persistent defaults in `~/.gitpulserc` so you don't repeat flags every run
-- **JSON output** - Machine-readable output for scripting, piping to `jq`, or dashboards
-- **Color output** - Green/yellow/red status in terminal, automatically disabled when piped
-- **Progress indicator** - See real-time status as each repo completes (suppress with `--quiet`)
-- **Graceful interruption** - Ctrl+C cancels pending tasks and prints a partial summary
-- **Logging** - Generates timestamped log files with automatic rotation (keeps last 20 runs)
-- **Security** - Strips credentials from log output, restricts log file permissions, verifies repo ownership
-- **Exit codes** - Returns 0 on success, 1 if any repo failed - suitable for scripting and CI
+## Table of Contents
 
-## Requirements
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Watchlist](#watchlist)
+- [Output](#output)
+- [CI / Automation Integration](#ci--automation-integration)
+- [Logging](#logging)
+- [Security](#security)
+- [Compatibility](#compatibility)
+- [Architecture](#architecture)
+- [Versioning & Support](#versioning--support)
+- [Contributing](#contributing)
+- [License](#license)
 
-- Python >= 3.10
-- Git >= 2.45.1 (recommended - gitpulse warns at startup if your version is vulnerable to CVE-2024-32002/32004/32465)
+---
+
+## Overview
+
+gitpulse walks a directory tree (and/or a persistent watchlist), discovers every git repository it can reach, and updates them concurrently. It is designed to be predictable in batch: repositories with uncommitted changes, detached HEADs, or missing upstreams are reported and skipped - never overwritten. Hung operations are terminated on a configurable timeout, and every run leaves a timestamped log behind for audit.
+
+### Feature Highlights
+
+| Capability | Summary |
+| --- | --- |
+| **Parallel updates** | Producer/consumer thread pool with configurable worker count. |
+| **Safe-by-default** | Dirty trees, detached HEADs, and untracked branches are skipped, never merged into. |
+| **Watchlist** | Track repositories scattered across filesystems in `~/.gitpulse_repos`. |
+| **Remote clone** | `--add <url>` clones HTTPS/SSH remotes with hooks disabled (CVE-2024-32002/32004/32465 mitigated). |
+| **Dry-run & fetch-only** | Preview discovery; check for incoming commits without merging. |
+| **Rebase mode** | `--rebase` for teams enforcing linear history. |
+| **SSH multiplexing** | ControlMaster reuses a single SSH session across repositories on the same host (Unix). |
+| **Exclude patterns** | `--exclude 'archived-*' 'vendor-*'` - glob-based filtering. |
+| **Timeout protection** | Kills hung git operations after N seconds. |
+| **Config file** | Persistent defaults in `~/.gitpulserc`; CLI flags always override. |
+| **JSON output** | Machine-readable summary for dashboards, `jq`, or CI pipelines. |
+| **Graceful interruption** | Ctrl+C cancels pending work and prints a partial summary. |
+| **Hardened logging** | Timestamped, rotated logs (0600 perms); credentials stripped from output. |
+| **Deterministic exit codes** | `0` on success, `1` on any failure - safe for CI and cron. |
+
+### Use Cases
+
+- Platform / DevEx teams keeping shared tool repositories fresh on developer workstations.
+- Build boxes or mirror hosts that maintain read-only clones of upstream projects.
+- Onboarding automation that bootstraps and refreshes a curated set of team repositories.
+- Release engineers reconciling many long-lived checkouts before a coordinated change.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/prodrom3/gitpulse.git
+cd gitpulse
+
+# Preview: what would be updated under the current directory?
+python gitpulse.py --dry-run
+
+# Update every repo under a given path, 16 workers, 60s timeout
+python gitpulse.py ~/projects --workers 16 --timeout 60
+```
+
+No packages, virtualenvs, or build steps required - only Python 3.10+ and `git`.
+
+---
 
 ## Installation
 
-**Option 1 - Run directly (no install):**
+### Requirements
+
+| Component | Minimum | Recommended | Notes |
+| --- | --- | --- | --- |
+| Python | 3.10 | 3.12+ | No third-party runtime dependencies. |
+| Git | 2.25 | **2.45.1+** | gitpulse warns at startup on versions affected by CVE-2024-32002 / 32004 / 32465. |
+| OS | Linux / macOS / Windows | - | SSH multiplexing is Unix-only; all other features are cross-platform. |
+
+### Option 1 - Run directly from source
 
 ```bash
 git clone https://github.com/prodrom3/gitpulse.git
@@ -50,115 +101,172 @@ cd gitpulse
 python gitpulse.py --help
 ```
 
-**Option 2 - Install as a command:**
+### Option 2 - Install as a system command
 
 ```bash
 git clone https://github.com/prodrom3/gitpulse.git
 cd gitpulse
 pip install .
-gitpulse --help    # now available anywhere
+gitpulse --help     # available on $PATH
 ```
 
-No third-party dependencies - only Python 3.10+ and git.
+### Option 3 - Install into an isolated environment
+
+```bash
+pipx install git+https://github.com/prodrom3/gitpulse.git
+```
+
+### Verifying the install
+
+```bash
+gitpulse --version        # prints the package version
+gitpulse --help           # prints usage
+```
+
+---
 
 ## Usage
 
-```bash
-python gitpulse.py [path] [options]
+```
+gitpulse [path] [options]
 ```
 
-### Arguments
+### CLI Reference
 
-| Argument | Description | Default |
-|---|---|---|
-| `path` | Root directory to scan for repositories | Current directory |
-| `-v, --version` | Show version and exit | |
-| `--dry-run` | List discovered repos without pulling | Off |
-| `--fetch-only` | Only fetch from remotes, do not merge or rebase | Off |
-| `--rebase` | Use `git pull --rebase` | Off |
-| `--depth N` | Maximum directory scan depth | 5 |
-| `--workers N` | Number of concurrent worker threads | 8 |
-| `--timeout N` | Seconds before a git operation is killed | 120 |
-| `--exclude PATTERN` | Glob patterns to skip repos by name | None |
-| `--json` | Output results as JSON | Off |
-| `-q, --quiet` | Suppress progress, only show summary | Off |
-| `--add PATH_OR_URL` | Add a repository to the watchlist (local path or remote URL) | |
-| `--remove PATH` | Remove a repository from the watchlist | |
-| `--list` | Show all repositories in the watchlist | |
-| `--watchlist` | Pull only watchlist repos (combine with path to also scan a directory) | Off |
-| `--clone-dir DIR` | Directory to clone remote repos into | Current directory |
+| Flag | Argument | Default | Description |
+| --- | --- | --- | --- |
+| `path` | directory | cwd | Root directory to scan for repositories. |
+| `-v`, `--version` | - | - | Print version and exit. |
+| `--dry-run` | - | off | List discovered repos without pulling. |
+| `--fetch-only` | - | off | Fetch from remotes; do not merge or rebase. |
+| `--rebase` | - | off | Use `git pull --rebase` instead of merge. |
+| `--depth` | `N` | 5 | Maximum directory-scan depth. |
+| `--workers` | `N` | 8 | Concurrent worker threads. |
+| `--timeout` | `N` | 120 | Seconds before a git operation is killed. |
+| `--exclude` | `PATTERN...` | - | Glob patterns to skip repos by directory name. |
+| `--json` | - | off | Emit machine-readable JSON output. |
+| `-q`, `--quiet` | - | off | Suppress per-repo progress; print only the summary. |
+| `--add` | `PATH_OR_URL` | - | Add a local path or remote URL to the watchlist. |
+| `--remove` | `PATH` | - | Remove an entry from the watchlist. |
+| `--list` | - | - | Print the watchlist. |
+| `--watchlist` | - | off | Pull only watchlist repos (combine with `path` to also scan a directory). |
+| `--clone-dir` | `DIR` | cwd | Directory to clone remote repos into (with `--add <url>`). |
 
 ### Examples
 
 ```bash
-# Update all repos under the current directory
+# Update everything under the current directory
 python gitpulse.py
 
-# Update all repos under a specific path
-python gitpulse.py /home/user/projects
+# Update repos under a specific path
+python gitpulse.py ~/projects
 
 # Preview which repos would be updated
 python gitpulse.py --dry-run
 
-# Fetch only - see what's new without merging
+# Check what's new across all repos without merging
 python gitpulse.py --fetch-only
 
-# Pull with rebase, 16 workers, and a 60-second timeout
+# Rebase-style updates, 16 workers, 60s timeout
 python gitpulse.py --rebase --workers 16 --timeout 60
 
-# Only scan 2 levels deep
+# Restrict directory traversal
 python gitpulse.py --depth 2
 
 # Skip archived and temporary repos
 python gitpulse.py --exclude 'archived-*' 'temp-*'
 
-# Get JSON output for scripting
+# JSON output for scripting
 python gitpulse.py --json | jq '.counts'
 
 # Quiet mode for CI - only summary, no progress
 python gitpulse.py --quiet
 
-# Check version
-python gitpulse.py --version
-
-# Add local repos to a persistent watchlist
-python gitpulse.py --add /home/user/projects/repo-a
-python gitpulse.py --add /home/user/work/repo-b
-
-# Add remote repos by URL (clones first, then adds to watchlist)
-python gitpulse.py --add https://github.com/user/repo.git
-python gitpulse.py --add git@gitlab.com:team/project.git
-
-# Clone into a specific directory instead of cwd
-python gitpulse.py --add https://github.com/user/repo.git --clone-dir /home/user/repos
-
-# See what's in the watchlist
+# Watchlist workflows
+python gitpulse.py --add ~/projects/important-api
+python gitpulse.py --add https://github.com/org/repo.git --clone-dir ~/repos
 python gitpulse.py --list
-
-# Pull only watchlist repos
 python gitpulse.py --watchlist
-
-# Pull watchlist repos AND scan a directory
-python gitpulse.py --watchlist /home/user/other-projects
-
-# Remove a repo from the watchlist
-python gitpulse.py --remove /home/user/projects/repo-a
+python gitpulse.py --remove ~/projects/deprecated
 ```
 
-### Output
+---
 
-gitpulse shows color-coded real-time progress as repos complete:
+## Configuration
+
+gitpulse reads an optional INI file at `~/.gitpulserc`. CLI flags always take precedence over file values.
+
+```ini
+[defaults]
+depth         = 5
+workers       = 8
+timeout       = 120
+max_log_files = 20
+rebase        = false
+clone_dir     = /home/user/repos
+
+[exclude]
+patterns = archived-*, .backup-*, vendor-*
+```
+
+### Environment Variables
+
+| Variable | Effect |
+| --- | --- |
+| `NO_COLOR` | When set to any non-empty value, disables ANSI color output. |
+
+### Precedence (highest to lowest)
+
+1. Command-line flags
+2. `~/.gitpulserc`
+3. Built-in defaults
+
+---
+
+## Watchlist
+
+For repositories scattered across multiple directories, use the **watchlist** (`~/.gitpulse_repos`) instead of - or alongside - directory scanning. The file is a newline-delimited list of absolute paths; blank lines and lines beginning with `#` are ignored.
+
+```bash
+# Add local repositories
+python gitpulse.py --add ~/projects/important-api
+python gitpulse.py --add ~/work/frontend
+
+# Add a remote by URL (clones first, then records the local path)
+python gitpulse.py --add https://github.com/org/repo.git
+python gitpulse.py --add git@gitlab.com:team/project.git
+
+# Clone into a specific directory
+python gitpulse.py --add https://github.com/org/repo.git --clone-dir ~/repos
+
+# Inspect
+python gitpulse.py --list
+
+# Pull everything in the watchlist
+python gitpulse.py --watchlist
+
+# Combine: watchlist + ad-hoc directory scan
+python gitpulse.py --watchlist ~/other-repos
+
+# Remove
+python gitpulse.py --remove ~/projects/deprecated
+```
+
+Supported URL schemes: `https://`, `http://`, `git@host:user/repo`, `ssh://`, `git://`.
+Stale entries (deleted or moved repos) are reported as a warning and do not block the rest of the run. The watchlist file is subject to the same ownership and permission checks as the config file on Unix.
+
+---
+
+## Output
+
+### Human-readable
 
 ```
   [1/9] updated: /home/user/projects/repo-a
   [2/9] up-to-date: /home/user/projects/repo-d
   [3/9] skipped: /home/user/projects/repo-e
   ...
-```
 
-Followed by a categorized summary:
-
-```
 --- Summary ---
 
 Updated (3):
@@ -167,7 +275,6 @@ Updated (3):
   /home/user/projects/tools/repo-c
 
 Already up-to-date (5):
-  /home/user/projects/repo-d
   ...
 
 Skipped (1):
@@ -178,17 +285,11 @@ Failed (0):
 Total: 9 | Updated: 3 | Up-to-date: 5 | Skipped: 1 | Failed: 0
 ```
 
-With `--fetch-only`, repos that have new commits show as "Fetched" with the commit count:
+With `--fetch-only`, repositories with incoming commits are reported as **Fetched** and include the commit count.
 
-```
-Fetched (2):
-  /home/user/projects/repo-a
-  /home/user/projects/repo-b
-```
+### JSON
 
-### JSON Output
-
-With `--json`, output is structured for machine consumption:
+With `--json`, stdout is a single JSON document:
 
 ```json
 {
@@ -206,94 +307,192 @@ With `--json`, output is structured for machine consumption:
       "status": "updated",
       "reason": null,
       "branch": "main",
-      "remote_url": "git@github.com:user/repo-a.git"
+      "remote_url": "git@github.com:org/repo-a.git"
     }
   ]
 }
 ```
 
-## Config File
+Progress lines go to `stderr`, so `--json` output remains pipeable to `jq`, dashboards, or downstream tooling.
 
-Create `~/.gitpulserc` to set persistent defaults:
+---
 
-```ini
-[defaults]
-depth = 5
-workers = 8
-timeout = 120
-max_log_files = 20
-rebase = false
-clone_dir = /home/user/repos
+## CI / Automation Integration
 
-[exclude]
-patterns = archived-*, .backup-*, vendor-*
+### Exit Codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | All discovered repositories updated or already up-to-date. |
+| `1` | At least one repository failed to update. |
+
+Skipped repositories (dirty, detached, no upstream) do **not** fail the run - they are surfaced in the summary for review.
+
+### GitHub Actions example
+
+```yaml
+- name: Refresh vendored clones
+  run: |
+    python gitpulse.py ./vendor --quiet --json > /tmp/gitpulse.json
+    jq '.counts' /tmp/gitpulse.json
 ```
 
-CLI flags always override config file values.
+### Cron example
 
-## Watchlist
-
-For repos scattered across different directories, use the watchlist instead of (or alongside) directory scanning. The watchlist is stored at `~/.gitpulse_repos` - one path per line, supports comments (`#`) and blank lines.
-
-```bash
-# Add local repos
-python gitpulse.py --add /home/user/projects/important-api
-python gitpulse.py --add /home/user/work/frontend
-
-# Add remote repos by URL (GitHub, GitLab, any git host)
-python gitpulse.py --add https://github.com/user/repo.git
-python gitpulse.py --add git@gitlab.com:team/project.git
-
-# Clone into a specific directory
-python gitpulse.py --add https://github.com/user/repo.git --clone-dir /home/user/repos
-
-# See what's tracked
-python gitpulse.py --list
-
-# Pull everything in the watchlist
-python gitpulse.py --watchlist
-
-# Pull watchlist + scan another directory
-python gitpulse.py --watchlist /home/user/other-repos
-
-# Clean up
-python gitpulse.py --remove /opt/tools/deployment-scripts
+```cron
+*/30 * * * *  /usr/local/bin/gitpulse ~/projects --quiet --fetch-only
 ```
 
-When you `--add` a remote URL, gitpulse clones it locally (to `--clone-dir` or the current directory), then adds the local path to the watchlist. Supported URL formats: HTTPS, SSH (`git@host:user/repo`), `ssh://`, and `git://`.
+Combine with JSON output to feed dashboards (Prometheus text exporter, Grafana Loki, ELK, etc.).
 
-You can set a default clone directory in `~/.gitpulserc`:
-
-```ini
-[defaults]
-clone_dir = /home/user/repos
-```
-
-Stale entries (deleted or moved repos) are flagged with a warning but don't block the rest of the run. The watchlist file has the same security checks as the config file (ownership and permissions on Unix).
+---
 
 ## Logging
 
-Each run creates a timestamped log file in the `logs/` directory (e.g. `2026-04-02_14-30-00.log`). Log files are automatically rotated - only the 20 most recent are kept (configurable via config file). Log files are created with restricted permissions (owner read/write only) and credentials are stripped from any logged output.
+Each run writes a timestamped log file to `./logs/` (relative to the gitpulse install root), e.g. `2026-04-02_14-30-00.log`. Log files are automatically rotated - only the most recent 20 are kept (configurable via `max_log_files` in `~/.gitpulserc`). Files are created with owner-only (0600) permissions, and HTTPS credentials of the form `https://user:token@host/` are sanitized to `https://***@host/` before being written.
 
-## Caution
-
-- Repos with uncommitted changes are automatically skipped to avoid merge conflicts. Commit or stash your work if you want them to be updated.
-- Ensure your repositories have the correct credentials (SSH keys or credential helpers) configured, as the script will use your existing git configuration.
-- On shared filesystems, repositories not owned by the current user are skipped.
+---
 
 ## Security
 
-gitpulse includes several hardening measures:
+gitpulse treats git operations on untrusted working directories as an attack surface and applies defense-in-depth:
 
-- **Git version check** - Warns at startup if git < 2.45.1 (affected by CVE-2024-32002, CVE-2024-32004, CVE-2024-32465)
-- **Safe clone** - Remote repos are cloned with `--no-checkout` and git hooks disabled via `GIT_CONFIG` environment variables, preventing malicious hook execution
-- **Credential stripping** - HTTPS credentials are stripped from all log output
-- **File permissions** - Log files are created with 0600 (owner-only) permissions
-- **Config/watchlist validation** - `~/.gitpulserc` and `~/.gitpulse_repos` are rejected if not owned by the current user or if world-writable (Unix)
-- **Repo ownership check** - Repositories not owned by the current user are skipped on Unix
-- **Symlink protection** - The `logs/` directory is verified to not be a symlink
-- **No shell injection** - All subprocess calls use list arguments, never `shell=True`
+| Control | Description |
+| --- | --- |
+| **Git version check** | Startup warning on git < 2.45.1 (CVE-2024-32002, CVE-2024-32004, CVE-2024-32465). |
+| **Safe remote clone** | `--add <url>` clones with `--no-checkout` and disables hooks via `GIT_CONFIG_*` env vars, then checks out in a second step. |
+| **Credential redaction** | HTTPS credentials stripped from all log and summary output. |
+| **Strict file permissions** | Log files chmod-ed to 0600 (Unix). |
+| **Ownership checks** | `~/.gitpulserc` and `~/.gitpulse_repos` rejected if not owned by the invoking user or world-writable (Unix). |
+| **Repository ownership** | Repos not owned by the current user are skipped on Unix. |
+| **Symlink protection** | The `logs/` directory is rejected if it is a symlink. |
+| **No shell injection** | Every subprocess call uses list arguments; `shell=True` is never used. |
 
-## Contribution
+### Reporting Vulnerabilities
 
-If you find any bugs or have ideas for improvements, feel free to open an issue or create a pull request on this repository. Your contributions are highly appreciated!
+Please report security issues privately by opening a [GitHub security advisory](https://github.com/prodrom3/gitpulse/security/advisories/new) rather than filing a public issue. Public issue reports are acceptable only for **already-disclosed** CVEs or clearly non-sensitive hardening suggestions.
+
+---
+
+## Compatibility
+
+| OS | Python 3.10 | 3.11 | 3.12 | 3.13 |
+| --- | :---: | :---: | :---: | :---: |
+| Ubuntu (latest) | ✓ | ✓ | ✓ | ✓ |
+| macOS (latest)  | ✓ | ✓ | ✓ | ✓ |
+| Windows (latest) | ✓ | ✓ | ✓ | ✓ |
+
+CI exercises every cell of this matrix on every push and pull request. See the [CI workflow](.github/workflows/ci.yml) and the ["CI" badge](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml) at the top of this file for current build status.
+
+---
+
+## Architecture
+
+### Module layout
+
+```
+gitpulse.py                 # thin entrypoint: signals, thread pool, orchestration
+core/
+├── cli.py                  # argparse, version resolution
+├── config.py               # ~/.gitpulserc loader + safety checks
+├── discovery.py            # depth-limited directory walk, exclude globs, ownership check
+├── logging_config.py       # logs/ setup, rotation, symlink protection
+├── models.py               # RepoResult, RepoStatus dataclasses
+├── output.py               # human + JSON summaries, ANSI color handling
+├── updater.py              # per-repo pull/fetch, git version guard, SSH multiplexing
+└── watchlist.py            # ~/.gitpulse_repos add / remove / list / safe-clone
+```
+
+### Module dependencies
+
+```mermaid
+flowchart LR
+    entry[gitpulse.py<br/>entrypoint]
+    cli[core.cli]
+    config[core.config]
+    logcfg[core.logging_config]
+    discovery[core.discovery]
+    watchlist[core.watchlist]
+    updater[core.updater]
+    output[core.output]
+    models[core.models]
+
+    entry --> cli
+    entry --> config
+    entry --> logcfg
+    entry --> discovery
+    entry --> watchlist
+    entry --> updater
+    entry --> output
+    cli --> config
+    discovery --> config
+    updater --> models
+    output --> models
+    watchlist -. clone .-> updater
+```
+
+### Run flow
+
+```mermaid
+flowchart TD
+    start([gitpulse invoked]) --> parse[Parse CLI args]
+    parse --> rc[Load ~/.gitpulserc]
+    rc --> src{Source of repos}
+    src -->|watchlist| wl[Read ~/.gitpulse_repos]
+    src -->|directory| scan[Walk directory tree]
+    src -->|both| wl
+    src -->|both| scan
+    wl --> dedup[Deduplicate]
+    scan --> dedup
+    dedup --> pool[ThreadPoolExecutor<br/>N workers]
+    pool --> state[Per-repo: check state<br/>detached / dirty / no upstream?]
+    state -->|not pullable| skip[Skip with reason]
+    state -->|pullable| fetch[git fetch]
+    fetch --> mode{fetch-only?}
+    mode -->|yes| report[Record behind count]
+    mode -->|no| pull[git pull / --rebase]
+    skip --> collect[Collect result]
+    report --> collect
+    pull --> collect
+    collect --> summary[Print summary<br/>human or JSON]
+    summary --> done([Exit 0 / 1])
+```
+
+---
+
+## Versioning & Support
+
+gitpulse follows [Semantic Versioning](https://semver.org/) 2.0. Breaking changes are introduced only in a new **major** version and are called out in the release notes.
+
+- **Stable:** CLI flags and exit codes.
+- **Stable:** JSON output schema.
+- **Internal:** the `core/` Python API is not a supported public API - import at your own risk.
+
+Current version: see [`VERSION`](./VERSION) and `gitpulse --version`.
+
+---
+
+## Contributing
+
+Contributions are welcome. Before opening a pull request:
+
+1. Run the local gate:
+   ```bash
+   python -m unittest discover -s tests -v
+   python -m mypy core/ gitpulse.py
+   python -m ruff check core/ gitpulse.py tests/
+   ```
+2. Add or update tests for behavior changes.
+3. Keep the change focused - one logical unit per PR.
+
+For larger features, please open an issue first to align on scope.
+
+---
+
+## License
+
+Released under the [MIT License](./LICENSE).
+
+---
+
+Authored by [prodrom3](https://github.com/prodrom3). Maintained by the **radamic** organization.

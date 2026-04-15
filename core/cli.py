@@ -1,10 +1,22 @@
 import argparse
 import os
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from .config import load_config
 
 
 def get_version() -> str:
+    """Return the gitpulse version.
+
+    Prefers installed package metadata (PEP 566) so a pip-installed command
+    reports the right version; falls back to the source VERSION file for
+    direct-source runs.
+    """
+    try:
+        return _pkg_version("gitpulse")
+    except PackageNotFoundError:
+        pass
     version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
     try:
         with open(version_file) as f:

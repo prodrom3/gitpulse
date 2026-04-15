@@ -9,7 +9,6 @@ from unittest import mock
 
 from core.watchlist import (
     _is_watchlist_safe,
-    _read_raw_entries,
     _safe_clone_env,
     add_to_watchlist,
     clone_repo,
@@ -103,7 +102,7 @@ class TestCloneRepo(unittest.TestCase):
     def test_successful_clone(self, mock_run: mock.Mock) -> None:
         mock_run.return_value = subprocess.CompletedProcess([], 0, "", "")
         target = os.path.join(self.tmpdir, "repo")
-        result = clone_repo("https://github.com/user/repo.git", self.tmpdir)
+        clone_repo("https://github.com/user/repo.git", self.tmpdir)
         # Two calls: clone --no-checkout, then checkout
         self.assertEqual(mock_run.call_count, 2)
         clone_cmd = mock_run.call_args_list[0][0][0]
@@ -333,7 +332,7 @@ class TestAddToWatchlist(unittest.TestCase):
             add_to_watchlist(repo_b)
 
         with open(self.wl_path) as f:
-            lines = [l.strip() for l in f if l.strip()]
+            lines = [line.strip() for line in f if line.strip()]
         self.assertEqual(len(lines), 2)
 
 

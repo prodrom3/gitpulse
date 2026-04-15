@@ -1,7 +1,6 @@
 import os
 import tempfile
 import unittest
-from unittest import mock
 
 from core.discovery import discover_repositories, is_excluded, validate_path
 

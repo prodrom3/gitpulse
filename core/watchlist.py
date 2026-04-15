@@ -256,7 +256,7 @@ def list_watchlist() -> list[str]:
     """List all entries in the watchlist, marking stale ones."""
     path = get_watchlist_path()
     if not os.path.isfile(path):
-        print("Watchlist is empty (no file at {})".format(path))
+        print(f"Watchlist is empty (no file at {path})")
         return []
 
     entries: list[str] = []

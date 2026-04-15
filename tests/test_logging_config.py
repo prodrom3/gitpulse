@@ -1,11 +1,10 @@
-import logging
 import os
 import tempfile
 import time
 import unittest
 from unittest import mock
 
-from core.logging_config import rotate_logs, setup_logging, _get_logs_directory
+from core.logging_config import _get_logs_directory, rotate_logs, setup_logging
 
 
 class TestRotateLogs(unittest.TestCase):

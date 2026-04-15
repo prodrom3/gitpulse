@@ -2,9 +2,8 @@ import subprocess
 import unittest
 from unittest import mock
 
-from core.models import RepoResult, RepoStatus
+from core.models import RepoStatus
 from core.updater import (
-    MIN_GIT_VERSION,
     SSHMultiplexer,
     check_git_version,
     check_repo_state,

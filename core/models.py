@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class RepoStatus(Enum):
@@ -15,11 +14,11 @@ class RepoStatus(Enum):
 class RepoResult:
     path: str
     status: RepoStatus
-    reason: Optional[str] = None
-    branch: Optional[str] = None
-    remote_url: Optional[str] = None
+    reason: str | None = None
+    branch: str | None = None
+    remote_url: str | None = None
 
-    def to_dict(self) -> dict[str, Optional[str]]:
+    def to_dict(self) -> dict[str, str | None]:
         return {
             "path": self.path,
             "status": self.status.value,
