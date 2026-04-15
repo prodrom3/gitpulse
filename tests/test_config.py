@@ -121,9 +121,10 @@ class TestConfigSafety(unittest.TestCase):
             self.assertFalse(_is_config_safe(path))
 
     def test_returns_true_on_windows(self):
+        path = self._write_config("[defaults]\n")
         with mock.patch("core.config.sys") as mock_sys:
             mock_sys.platform = "win32"
-            self.assertTrue(_is_config_safe("/any/path"))
+            self.assertTrue(_is_config_safe(path))
 
     def test_unsafe_config_returns_defaults(self):
         path = self._write_config("[defaults]\nworkers = 99\n")

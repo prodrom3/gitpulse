@@ -217,9 +217,10 @@ class TestWatchlistSafety(unittest.TestCase):
         self.assertFalse(_is_watchlist_safe(path))
 
     def test_returns_true_on_windows(self) -> None:
+        path = self._write_file("/tmp/repo\n")
         with mock.patch("core.watchlist.sys") as mock_sys:
             mock_sys.platform = "win32"
-            self.assertTrue(_is_watchlist_safe("/any/path"))
+            self.assertTrue(_is_watchlist_safe(path))
 
     def test_nonexistent_path(self) -> None:
         self.assertFalse(_is_watchlist_safe("/nonexistent/file"))

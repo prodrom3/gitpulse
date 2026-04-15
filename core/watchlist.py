@@ -121,24 +121,25 @@ def clone_repo(url: str, clone_dir: str, timeout: int = 120) -> str | None:
 
 
 def _is_watchlist_safe(path: str) -> bool:
-    """Verify the watchlist file is owned by the current user and not world-writable."""
-    if sys.platform == "win32":
-        return True
+    """Verify the watchlist file exists and (on Unix) is owned by the current user
+    and not world-writable. A nonexistent path is never considered safe."""
     try:
         st = os.stat(path)
-        if st.st_uid != os.getuid():
-            logging.warning(
-                f"Ignoring {path}: owned by uid {st.st_uid}, not current user"
-            )
-            return False
-        if st.st_mode & stat.S_IWOTH:
-            logging.warning(
-                f"Ignoring {path}: world-writable (fix with: chmod o-w {path})"
-            )
-            return False
-        return True
     except OSError:
         return False
+    if sys.platform == "win32":
+        return True
+    if st.st_uid != os.getuid():
+        logging.warning(
+            f"Ignoring {path}: owned by uid {st.st_uid}, not current user"
+        )
+        return False
+    if st.st_mode & stat.S_IWOTH:
+        logging.warning(
+            f"Ignoring {path}: world-writable (fix with: chmod o-w {path})"
+        )
+        return False
+    return True
 
 
 def load_watchlist() -> list[str]:
