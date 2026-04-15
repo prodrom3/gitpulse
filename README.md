@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.5.0-orange.svg)](./VERSION)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -47,7 +47,7 @@
 - [Obsidian vault export](#obsidian-vault-export)
   - [Configure the vault path](#configure-the-vault-path)
   - [What gets written](#what-gets-written)
-  - [One-way, by design](#one-way-by-design)
+  - [Narrow two-way sync (as of 2.5.0)](#narrow-two-way-sync-as-of-250)
 - [Portable export and import](#portable-export-and-import)
   - [Export](#export)
   - [Import](#import)
@@ -209,7 +209,8 @@ gitpulse [verb] [options]
 | `triage` | Walk newly-added repos interactively and classify them. |
 | `refresh` | Fetch upstream metadata (stars, archived, last push, release). Opsec-gated. |
 | `digest` | Weekly changeset report over the local index (zero network). |
-| `vault export` | Render the index into an Obsidian vault (one-way markdown). |
+| `vault export` | Render the index into an Obsidian vault (DB -> markdown). |
+| `vault sync` | Read operator edits to `status` / `tags` in the vault back into the DB, then regenerate every file. |
 | `export` | Write a schema-versioned JSON bundle of the index (portable; supports redaction). |
 | `import` | Load a bundle into the index (merge by default; `--replace` wipes; `--remap` rewrites paths). |
 | `update` | Check for / apply a gitpulse self-update. Auto-detects source clone / pipx / pip. |
@@ -609,9 +610,32 @@ upstream:
 - **2026-04-14T09:30:00+00:00** - "used in demo"
 ```
 
-### One-way, by design
+### Narrow two-way sync (as of 2.5.0)
 
-The vault is a **view**; the index DB is the source of truth. Every `vault export` run rewrites each `.md` atomically (temp-file + rename). Anything you edit in Obsidian is overwritten on the next export. This is intentional - it keeps the model unambiguous and avoids the merge-conflict surface of a two-way sync. Two-way sync (parsing your Obsidian edits back into the index) is a deliberately deferred future phase.
+The vault is reconciliable with the DB, but **on a deliberately narrow surface**. `gitpulse vault sync` reads operator edits to `status` and `tags` out of each file's frontmatter, applies them to the DB, and then regenerates every `.md` from the reconciled state.
+
+| Field | Writer | Sync behaviour |
+| --- | --- | --- |
+| `status` | operator (Obsidian Properties) | vault wins, DB is updated on next `vault sync` |
+| `tags` | operator (Obsidian Properties) | vault wins, DB tag set is replaced to match |
+| `upstream.*` | `gitpulse refresh` | DB wins, vault values are regenerated on sync |
+| `last_touched`, `remote_url`, `path`, `added`, `gitpulse_id` | gitpulse | DB wins, regenerated on sync |
+| Note body (Markdown) | gitpulse (via `gitpulse note`) | DB wins, body is regenerated on sync; vault edits to the Notes section are ignored |
+
+The two sides never write to the same field, so there is no merge-conflict surface and no precedence timestamp needed. Orphan vault files (whose `gitpulse_id` no longer matches a repo in the DB) are reported, not deleted; the operator decides.
+
+```bash
+# Edit tags / status in Obsidian, then pull them into the DB
+gitpulse vault sync
+
+# JSON summary for scripting / cron
+gitpulse vault sync --json
+
+# Override the vault path per invocation
+gitpulse vault sync --path ~/other-vault
+```
+
+`gitpulse vault export` is still supported and useful as a one-shot "rebuild from DB" operation (for example right after a large `gitpulse refresh`); `vault sync` is the right daily verb because it also catches any tag/status curation you did in Obsidian.
 
 Note: the vault contains the same sensitive operator context as the index (tags, sources, notes, upstream metadata). Treat the vault directory with the same opsec posture as `$XDG_DATA_HOME/gitpulse/`: files are written `0600` and the `repos` subdirectory is created `0700` on Unix; keep the vault on an encrypted volume at rest.
 
