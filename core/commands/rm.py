@@ -8,7 +8,6 @@ vault .md file is also deleted if the vault path is configured.
 from __future__ import annotations
 
 import argparse
-import glob
 import os
 import shutil
 import sys
