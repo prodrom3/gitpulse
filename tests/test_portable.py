@@ -382,7 +382,7 @@ class TestImportBundle(_IndexTestCase):
             bundle = portable.build_bundle(conn)
         other_db = os.path.join(self.tmp, "other.db")
         with index.connect(other_db) as conn:
-            stats = portable.import_bundle(
+            portable.import_bundle(
                 conn, bundle, mode="merge",
                 dry_run=True, clone_missing=False,
             )
