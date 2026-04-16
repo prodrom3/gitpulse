@@ -1,4 +1,4 @@
-"""`gitpulse import` - load a portable JSON bundle into the metadata index."""
+"""`nostos import` - load a portable JSON bundle into the metadata index."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def add_parser(subparsers: Any) -> None:
         "import",
         help="Load a portable JSON bundle into the metadata index",
         description=(
-            "Apply a gitpulse export bundle to the local index. Default "
+            "Apply a nostos export bundle to the local index. Default "
             "behaviour is additive (merge): existing repos are not "
             "touched; missing repos are added; tags and notes are appended."
         ),

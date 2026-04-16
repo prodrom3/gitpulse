@@ -1,4 +1,4 @@
-"""`gitpulse vault` - bridge the metadata index with an Obsidian vault.
+"""`nostos vault` - bridge the metadata index with an Obsidian vault.
 
 Two sub-verbs:
 - `vault export`  rewrite every markdown file from the DB (one-way).
@@ -7,9 +7,9 @@ Two sub-verbs:
 
 The read-back surface is deliberately narrow and partitioned from
 the DB-authoritative fields (upstream.*, last_touched, remote_url,
-path, added, gitpulse_id). This avoids having to resolve conflicts:
+path, added, nostos_id). This avoids having to resolve conflicts:
 the two sides never write to the same field. Body content (notes)
-remains DB-authoritative; use `gitpulse note` to add notes.
+remains DB-authoritative; use `nostos note` to add notes.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def add_parser(subparsers: Any) -> None:
         ),
     )
     exp.add_argument("--path", default=None, metavar="DIR",
-                     help="Vault path; overrides [vault] path in ~/.gitpulserc")
+                     help="Vault path; overrides [vault] path in ~/.nostosrc")
     exp.add_argument("--subdir", default=None, metavar="NAME",
                      help="Subdirectory inside the vault (default: 'repos' or config value)")
     exp.add_argument("--quiet", action="store_true",
@@ -56,12 +56,12 @@ def add_parser(subparsers: Any) -> None:
             "tags edits to the DB, then rewrite every markdown file "
             "from the reconciled DB state. DB-authoritative fields "
             "(upstream metadata, timestamps, path, remote_url, "
-            "gitpulse_id) are ignored on read and regenerated on write; "
-            "note body edits are ignored (use `gitpulse note`)."
+            "nostos_id) are ignored on read and regenerated on write; "
+            "note body edits are ignored (use `nostos note`)."
         ),
     )
     syn.add_argument("--path", default=None, metavar="DIR",
-                     help="Vault path; overrides [vault] path in ~/.gitpulserc")
+                     help="Vault path; overrides [vault] path in ~/.nostosrc")
     syn.add_argument("--subdir", default=None, metavar="NAME",
                      help="Subdirectory inside the vault (default: 'repos' or config value)")
     syn.add_argument("--json", action="store_true",
@@ -95,7 +95,7 @@ def run_export(args: argparse.Namespace) -> int:
 
     if not vault_path:
         return fail(
-            "vault path not set. Pass --path DIR or add [vault] path to ~/.gitpulserc."
+            "vault path not set. Pass --path DIR or add [vault] path to ~/.nostosrc."
         )
 
     # Imported lazily to avoid a circular import with core.cli.
@@ -106,7 +106,7 @@ def run_export(args: argparse.Namespace) -> int:
         with _index.connect() as conn:
             loader = _IndexLoader(conn)
             written = _vault.export_all(
-                target, loader, gitpulse_version=_get_version()
+                target, loader, nostos_version=_get_version()
             )
     except OSError as e:
         return fail(str(e))
@@ -189,7 +189,7 @@ def run_sync(args: argparse.Namespace) -> int:
 
     if not vault_path:
         return fail(
-            "vault path not set. Pass --path DIR or add [vault] path to ~/.gitpulserc."
+            "vault path not set. Pass --path DIR or add [vault] path to ~/.nostosrc."
         )
 
     from ..cli import get_version as _get_version
@@ -200,7 +200,7 @@ def run_sync(args: argparse.Namespace) -> int:
             writer = _IndexSyncWriter(conn)
             reader = _IndexLoader(conn)
             stats = _vault.sync_vault(
-                target, reader, writer, gitpulse_version=_get_version()
+                target, reader, writer, nostos_version=_get_version()
             )
     except OSError as e:
         return fail(str(e))

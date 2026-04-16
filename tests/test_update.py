@@ -103,16 +103,16 @@ class TestDetectInstallMethod(unittest.TestCase):
         self.assertIsNotNone(d["source_dir"])
 
     def test_falls_back_to_pipx_when_not_a_repo(self):
-        with mock.patch("core.updater_self._looks_like_gitpulse_repo", return_value=False), mock.patch(
-            "core.updater_self._pipx_has_gitpulse", return_value=True
+        with mock.patch("core.updater_self._looks_like_nostos_repo", return_value=False), mock.patch(
+            "core.updater_self._pipx_has_nostos", return_value=True
         ):
             d = _self.detect_install_method()
         self.assertEqual(d["method"], "pipx")
-        self.assertEqual(d["upgrade_cmd"], "pipx upgrade gitpulse")
+        self.assertEqual(d["upgrade_cmd"], "pipx upgrade nostos")
 
     def test_falls_back_to_pip_when_neither(self):
-        with mock.patch("core.updater_self._looks_like_gitpulse_repo", return_value=False), mock.patch(
-            "core.updater_self._pipx_has_gitpulse", return_value=False
+        with mock.patch("core.updater_self._looks_like_nostos_repo", return_value=False), mock.patch(
+            "core.updater_self._pipx_has_nostos", return_value=False
         ):
             d = _self.detect_install_method()
         self.assertEqual(d["method"], "pip")
@@ -137,7 +137,7 @@ class TestRunUpgrade(unittest.TestCase):
             mr.return_value = mock.Mock(returncode=0, stdout="upgraded", stderr="")
             _self.run_upgrade({"method": "pipx", "source_dir": None, "upgrade_cmd": ""})
         called = mr.call_args[0][0]
-        self.assertEqual(called, ["pipx", "upgrade", "gitpulse"])
+        self.assertEqual(called, ["pipx", "upgrade", "nostos"])
 
     def test_pip_raises_instead_of_running(self):
         with self.assertRaises(_self.UpdateError):
@@ -210,7 +210,7 @@ class TestUpdateCommand(unittest.TestCase):
         ) as out, mock.patch("sys.stderr", new_callable=io.StringIO):
             rc = cmd_update.run(self._args(offline=True))
         self.assertEqual(rc, 0)
-        self.assertIn("gitpulse", out.getvalue())
+        self.assertIn("nostos", out.getvalue())
         self.assertIn("upgrade_cmd", out.getvalue())
 
     def test_check_reports_up_to_date(self):

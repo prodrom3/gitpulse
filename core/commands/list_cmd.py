@@ -1,4 +1,4 @@
-"""`gitpulse list` - filter and print the repo fleet from the metadata index."""
+"""`nostos list` - filter and print the repo fleet from the metadata index."""
 
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ def run(args: argparse.Namespace) -> int:
                 upstream_stale_days=getattr(args, "upstream_stale", None),
             )
     except OSError as e:
-        print(f"gitpulse: error: {e}", file=sys.stderr)
+        print(f"nostos: error: {e}", file=sys.stderr)
         return 1
 
     if args.json:

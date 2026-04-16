@@ -7,7 +7,7 @@ build/
 .ruff_cache/
 .claude/
 
-# Personal / local exports of the gitpulse metadata index.
+# Personal / local exports of the nostos metadata index.
 # Users should never accidentally commit their own fleet data.
 pr3srepos.json
 *_repos.json

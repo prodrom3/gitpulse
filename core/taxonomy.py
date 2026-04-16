@@ -7,9 +7,9 @@ in list / show / digest / vault without memorising the matrix.
 Usage convention
 - Tags prefixed with `attack:` are treated as ATT&CK technique IDs.
 - The prefix is case-insensitive on input; stored lowercase.
-- `gitpulse tag <repo> +attack:T1059` adds the tag `attack:t1059`.
-- `gitpulse list --attack T1059` filters by it.
-- `gitpulse attack list` prints the built-in lookup table.
+- `nostos tag <repo> +attack:T1059` adds the tag `attack:t1059`.
+- `nostos list --attack T1059` filters by it.
+- `nostos attack list` prints the built-in lookup table.
 
 The table is intentionally a curated subset of the most common
 offensive-tool-relevant techniques, not the full 700+ matrix. Pull

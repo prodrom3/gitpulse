@@ -36,13 +36,13 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Verify script syntax
-        run: python -c "import py_compile; py_compile.compile('gitpulse.py', doraise=True)"
+        run: python -c "import py_compile; py_compile.compile('nostos.py', doraise=True)"
 
       - name: Verify --version flag (from source)
-        run: python gitpulse.py --version
+        run: python nostos.py --version
 
       - name: Verify --help flag (from source)
-        run: python gitpulse.py --help
+        run: python nostos.py --help
 
   lint:
     name: lint
@@ -60,7 +60,7 @@ jobs:
         run: python -m pip install ruff
 
       - name: Run ruff
-        run: ruff check core/ gitpulse.py tests/
+        run: ruff check core/ nostos.py tests/
 
   type-check:
     name: type-check (mypy)
@@ -78,7 +78,7 @@ jobs:
         run: python -m pip install mypy
 
       - name: Run mypy
-        run: mypy core/ gitpulse.py
+        run: mypy core/ nostos.py
 
   build:
     name: build & install
@@ -104,8 +104,8 @@ jobs:
 
       - name: Smoke-test installed CLI
         run: |
-          gitpulse --version
-          gitpulse --help
+          nostos --version
+          nostos --help
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

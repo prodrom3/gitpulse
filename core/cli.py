@@ -1,7 +1,7 @@
-"""Argparse / subcommand dispatch for gitpulse.
+"""Argparse / subcommand dispatch for nostos.
 
-The top-level command is a verb-first subparser tree: `gitpulse pull`,
-`gitpulse add`, `gitpulse list`, etc. Invocations without a verb are
+The top-level command is a verb-first subparser tree: `nostos pull`,
+`nostos add`, `nostos list`, etc. Invocations without a verb are
 treated as an implicit `pull` for backward compatibility. The legacy
 top-level flags (--add, --remove, --list) are rewritten to their
 subcommand equivalents and emit a deprecation notice.
@@ -45,7 +45,7 @@ _KNOWN_VERBS: frozenset[str] = frozenset(
 
 
 def get_version() -> str:
-    """Return the gitpulse version.
+    """Return the nostos version.
 
     Reads the VERSION file at the repo root first so source-tree edits
     are reflected immediately. Falls back to installed package metadata
@@ -60,17 +60,17 @@ def get_version() -> str:
     except OSError:
         pass
     try:
-        return _pkg_version("gitpulse")
+        return _pkg_version("nostos")
     except PackageNotFoundError:
         return "unknown"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gitpulse",
+        prog="nostos",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "gitpulse - manage a fleet of git repositories.\n"
+            "nostos - manage a fleet of git repositories.\n"
             "\n"
             "Pull updates in parallel, maintain a curated index with tags, "
             "status, and notes, probe upstream metadata (stars, archived, "
@@ -80,15 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Examples:\n"
-            "  gitpulse pull ~/code               Pull every repo under ~/code\n"
-            "  gitpulse pull --from-index --tags  Pull indexed repos + all their git tags\n"
-            "  gitpulse add URL --tag python      Clone a remote repo and register it\n"
-            "  gitpulse list --tag security       Show indexed repos carrying a tag\n"
-            "  gitpulse refresh                   Fetch upstream metadata for the index\n"
-            "  gitpulse export --out fleet.json   Export the full index for portability\n"
+            "  nostos pull ~/code               Pull every repo under ~/code\n"
+            "  nostos pull --from-index --tags  Pull indexed repos + all their git tags\n"
+            "  nostos add URL --tag python      Clone a remote repo and register it\n"
+            "  nostos list --tag security       Show indexed repos carrying a tag\n"
+            "  nostos refresh                   Fetch upstream metadata for the index\n"
+            "  nostos export --out fleet.json   Export the full index for portability\n"
             "\n"
-            "Run `gitpulse <command> --help` for flags on a specific command.\n"
-            "Docs: https://github.com/prodrom3/gitpulse"
+            "Run `nostos <command> --help` for flags on a specific command.\n"
+            "Docs: https://github.com/prodrom3/nostos"
         ),
     )
     parser.add_argument(
@@ -131,8 +131,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _rewrite_legacy_argv(argv: list[str]) -> list[str]:
     """Translate legacy top-level flags to subcommand form.
 
-    Keeps `gitpulse --add X`, `gitpulse --remove X`, `gitpulse --list`,
-    and `gitpulse --watchlist` working for one release. Users get a
+    Keeps `nostos --add X`, `nostos --remove X`, `nostos --list`,
+    and `nostos --watchlist` working for one release. Users get a
     one-line deprecation notice to stderr when a legacy flag fires.
     """
     if not argv:
@@ -166,7 +166,7 @@ def _rewrite_legacy_argv(argv: list[str]) -> list[str]:
 
 def _deprecate(old: str, new_verb: str) -> None:
     print(
-        f"gitpulse: warning: {old} is deprecated; use `gitpulse {new_verb}` instead",
+        f"nostos: warning: {old} is deprecated; use `nostos {new_verb}` instead",
         file=sys.stderr,
         flush=True,
     )
@@ -222,5 +222,5 @@ def parse_args() -> argparse.Namespace:
 
 
 def main_entry() -> None:
-    """Entry point for the pip-installed `gitpulse` console script."""
+    """Entry point for the pip-installed `nostos` console script."""
     sys.exit(run(sys.argv[1:]))

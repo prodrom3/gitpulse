@@ -291,7 +291,7 @@ class TestRm(_IndexTestCase):
         # Create a matching vault file (slug = "vaulted")
         md_path = os.path.join(repos_dir, "vaulted.md")
         with open(md_path, "w") as f:
-            f.write("---\ngitpulse_id: 1\n---\n")
+            f.write("---\nnostos_id: 1\n---\n")
         args = argparse.Namespace(
             target=repo, purge=False, cleanup_vault=True, yes=False
         )

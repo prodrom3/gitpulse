@@ -1,4 +1,4 @@
-"""`gitpulse show` - per-repo dashboard."""
+"""`nostos show` - per-repo dashboard."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ def _print_human(repo: dict[str, Any], upstream: dict[str, Any] | None) -> None:
         if upstream.get("fetch_error"):
             print(f"  Fetch error:   {upstream['fetch_error']}")
     else:
-        print("\nUpstream:   - (run `gitpulse refresh` to populate)")
+        print("\nUpstream:   - (run `nostos refresh` to populate)")
 
     notes = repo.get("notes", [])
     if notes:

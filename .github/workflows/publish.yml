@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/gitpulse
+      url: https://test.pypi.org/p/nostos
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/gitpulse
+      url: https://pypi.org/p/nostos
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4

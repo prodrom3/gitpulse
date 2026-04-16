@@ -1,16 +1,16 @@
-"""`gitpulse update` - check for / apply a gitpulse self-update.
+"""`nostos update` - check for / apply a nostos self-update.
 
 Flow:
 1. --offline: print the install-method detection and the current
    version; never contact the network.
 2. --check: make one HTTPS GET to api.github.com/repos/prodrom3/
-   gitpulse/releases/latest, compare against the running version,
+   nostos/releases/latest, compare against the running version,
    print a single line summary, exit 0.
 3. default (no --check): same release check, then if an upgrade is
    available AND the install method supports an automatic upgrade,
    prompt for confirmation (or --yes to skip) and run it.
 
-This command is the only part of gitpulse that reaches out to
+This command is the only part of nostos that reaches out to
 github.com in its default configuration. It is an opt-in network
 call on the user's explicit command; --offline kills it hard.
 """
@@ -29,9 +29,9 @@ from ._common import fail, maybe_migrate_watchlist
 def add_parser(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "update",
-        help="Check for / apply a gitpulse self-update",
+        help="Check for / apply a nostos self-update",
         description=(
-            "Compare the running gitpulse version against the latest "
+            "Compare the running nostos version against the latest "
             "release and (optionally) apply an upgrade. The network "
             "call goes only to api.github.com; --offline hard-disables it."
         ),
@@ -73,7 +73,7 @@ def run(args: argparse.Namespace) -> int:
     detection = _self.detect_install_method()
 
     if args.offline:
-        print(f"gitpulse {current} (install method: {detection['method']})")
+        print(f"nostos {current} (install method: {detection['method']})")
         print(f"  upgrade_cmd: {detection['upgrade_cmd']}")
         print(f"  note: {detection['notes']}")
         print("offline mode: no release check performed.", file=sys.stderr)
@@ -93,7 +93,7 @@ def run(args: argparse.Namespace) -> int:
 
     newer = _self.is_newer(remote, current)
     summary = (
-        f"gitpulse {current} (install method: {detection['method']}) "
+        f"nostos {current} (install method: {detection['method']}) "
         f"-> latest release: {remote} "
         f"{'[update available]' if newer else '[up to date]'}"
     )

@@ -59,9 +59,9 @@ class TestBuildBundle(_IndexTestCase):
     def test_schema_and_envelope(self):
         with index.connect(self.db) as conn:
             self._seed(conn)
-            bundle = portable.build_bundle(conn, gitpulse_version="2.4.0")
+            bundle = portable.build_bundle(conn, nostos_version="2.4.0")
         self.assertEqual(bundle["schema"], portable.CURRENT_EXPORT_SCHEMA)
-        self.assertEqual(bundle["gitpulse_version"], "2.4.0")
+        self.assertEqual(bundle["nostos_version"], "2.4.0")
         self.assertFalse(bundle["redacted"])
         self.assertIsInstance(bundle["repos"], list)
         self.assertEqual(len(bundle["repos"]), 2)
@@ -329,7 +329,7 @@ class TestImportCommand(_IndexTestCase):
         bundle = {
             "schema": 1,
             "exported_at": "2026-04-15T00:00:00+00:00",
-            "gitpulse_version": "2.4.0",
+            "nostos_version": "2.4.0",
             "redacted": False,
             "repos": repos or [
                 {
@@ -440,7 +440,7 @@ class TestImportCommand(_IndexTestCase):
         bundle = {
             "schema": 1,
             "exported_at": "2026-04-15T00:00:00+00:00",
-            "gitpulse_version": "2.4.0",
+            "nostos_version": "2.4.0",
             "redacted": False,
             "repos": [{
                 "path": "/tmp/stdin",

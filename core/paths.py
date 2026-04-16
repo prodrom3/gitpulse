@@ -1,16 +1,16 @@
-"""XDG Base Directory resolution for gitpulse.
+"""XDG Base Directory resolution for nostos.
 
 The metadata index and auth/config files live outside the repo tree so an
 accidental `git add .` cannot pick them up. Paths follow the XDG Base
-Directory Specification: config in $XDG_CONFIG_HOME/gitpulse, data in
-$XDG_DATA_HOME/gitpulse. Windows has no XDG convention, so we fall back
+Directory Specification: config in $XDG_CONFIG_HOME/nostos, data in
+$XDG_DATA_HOME/nostos. Windows has no XDG convention, so we fall back
 to the user profile directory.
 """
 
 import os
 import sys
 
-APP_NAME: str = "gitpulse"
+APP_NAME: str = "nostos"
 
 
 def _home() -> str:

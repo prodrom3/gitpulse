@@ -1,4 +1,4 @@
-"""Upstream metadata probes for gitpulse.
+"""Upstream metadata probes for nostos.
 
 Parses a git remote URL into (provider, host, owner, name), then calls
 the matching provider probe to fetch a small metadata record (stars,
@@ -8,7 +8,7 @@ is cached in the metadata index.
 Design principles
 - Zero new runtime dependencies: everything uses urllib.request.
 - Fail-closed on unknown hosts: a host not present in
-  ~/.config/gitpulse/auth.toml is skipped entirely (no network call).
+  ~/.config/nostos/auth.toml is skipped entirely (no network call).
   This is the critical opsec guarantee; see README > Security.
 - Per-repo `quiet=1` repos are always skipped: the upstream layer
   never queries them, never logs them.
@@ -125,7 +125,7 @@ def _http_get_json(
     failures. Never logs Authorization headers.
     """
     req = urllib.request.Request(url, method="GET")
-    req.add_header("User-Agent", "gitpulse")
+    req.add_header("User-Agent", "nostos")
     if accept:
         req.add_header("Accept", accept)
     if token:
@@ -184,7 +184,7 @@ def _respect_rate_limit(headers: dict[str, str]) -> None:
     try:
         if remaining is not None and int(remaining) <= 1:
             logging.warning(
-                "gitpulse: upstream rate-limit nearly exhausted "
+                "nostos: upstream rate-limit nearly exhausted "
                 f"(remaining={remaining}); sleeping 2s"
             )
             time.sleep(2)
@@ -251,7 +251,7 @@ class GitHubProbe:
         except ProbeHTTPError as e:
             if e.status != 404:
                 # Non-404 is unusual but not fatal; leave latest_release as None.
-                logging.debug(f"gitpulse: release fetch failed: {e}")
+                logging.debug(f"nostos: release fetch failed: {e}")
         except ProbeError:
             pass
 
@@ -312,7 +312,7 @@ class GitLabProbe:
             req = urllib.request.Request(
                 f"{base}/projects/{project}/releases?per_page=1", method="GET"
             )
-            req.add_header("User-Agent", "gitpulse")
+            req.add_header("User-Agent", "nostos")
             if token:
                 req.add_header("Authorization", f"Bearer {token}")
             with urllib.request.urlopen(req, timeout=15) as resp:

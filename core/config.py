@@ -9,7 +9,7 @@ DEFAULT_DEPTH: int = 5
 DEFAULT_TIMEOUT: int = 120
 DEFAULT_WORKERS: int = 8
 DEFAULT_MAX_LOG_FILES: int = 20
-CONFIG_FILENAME: str = ".gitpulserc"
+CONFIG_FILENAME: str = ".nostosrc"
 
 
 def get_config_path() -> str:
@@ -39,7 +39,7 @@ def _is_config_safe(config_path: str) -> bool:
 
 
 def load_config() -> dict[str, Any]:
-    """Load config from ~/.gitpulserc if it exists.
+    """Load config from ~/.nostosrc if it exists.
 
     Expected format (INI):
         [defaults]

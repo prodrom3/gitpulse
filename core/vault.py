@@ -16,9 +16,9 @@ Two directions are supported:
   edits flow back into the DB. Only a fixed, partitioned set of
   fields is read: `status` and `tags`. DB-authoritative fields
   (`upstream.*`, `last_touched`, `remote_url`, `path`, `added`,
-  `gitpulse_id`) are ignored on read and regenerated on the
+  `nostos_id`) are ignored on read and regenerated on the
   subsequent write. Body content (notes) stays DB-authoritative;
-  use `gitpulse note` to add new notes. This partitioning removes
+  use `nostos note` to add new notes. This partitioning removes
   the need for conflict resolution: the two sides never write to
   the same field.
 
@@ -165,11 +165,11 @@ def render_markdown(
     upstream: dict[str, Any] | None,
     notes: list[dict[str, Any]],
     *,
-    gitpulse_version: str = "unknown",
+    nostos_version: str = "unknown",
 ) -> str:
     """Produce the full markdown content for one repo."""
     frontmatter: dict[str, Any] = {
-        "gitpulse_id": repo["id"],
+        "nostos_id": repo["id"],
         "path": repo["path"],
         "remote_url": _redact_remote_url(repo.get("remote_url")),
         "source": repo.get("source"),
@@ -210,7 +210,7 @@ def render_markdown(
         "",
         f"# {header_repo}",
         "",
-        f"*Exported by gitpulse {gitpulse_version} on {now}*",
+        f"*Exported by nostos {nostos_version} on {now}*",
         "",
     ]
 
@@ -246,14 +246,14 @@ def export_repo(
     upstream: dict[str, Any] | None,
     notes: list[dict[str, Any]],
     *,
-    gitpulse_version: str = "unknown",
+    nostos_version: str = "unknown",
 ) -> str:
     """Write one repo's markdown to the vault. Returns the file path."""
     target.ensure()
     slug = repo_slug(repo, upstream)
     out_path = os.path.join(target.repos_dir, slug + ".md")
     md = render_markdown(
-        repo, upstream, notes, gitpulse_version=gitpulse_version
+        repo, upstream, notes, nostos_version=nostos_version
     )
     # Atomic write: temp file + rename so a crash mid-write does not
     # leave a partial file in the vault.
@@ -269,7 +269,7 @@ def export_all(
     target: VaultTarget,
     loader: Any,
     *,
-    gitpulse_version: str = "unknown",
+    nostos_version: str = "unknown",
 ) -> list[str]:
     """Export every repo in the index to the vault.
 
@@ -282,7 +282,7 @@ def export_all(
         upstream = repo.get("upstream")
         notes = repo.get("notes", [])
         path = export_repo(
-            target, repo, upstream, notes, gitpulse_version=gitpulse_version
+            target, repo, upstream, notes, nostos_version=nostos_version
         )
         written.append(path)
     return written
@@ -368,7 +368,7 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     """Extract the YAML frontmatter and body from a vault markdown file.
 
     Returns (frontmatter_dict, body). Raises FrontmatterError if the
-    `---` fence is absent or malformed. Only the shapes gitpulse
+    `---` fence is absent or malformed. Only the shapes nostos
     itself writes are recognised:
 
     - top-level scalars (str / int / bool / null)
@@ -469,7 +469,7 @@ def parse_notes_from_body(body: str) -> list[dict[str, str]]:
     Only bullets matching the exact pattern our writer emits are
     recognised: `- **<timestamp>** - <body>`. Everything else is
     silently ignored (it might be a user-added heading, freeform
-    text, etc. - those are not gitpulse-managed notes).
+    text, etc. - those are not nostos-managed notes).
     """
     in_notes_section = False
     notes: list[dict[str, str]] = []
@@ -495,13 +495,13 @@ def sync_vault(
     reader: Any,
     writer: Any,
     *,
-    gitpulse_version: str = "unknown",
+    nostos_version: str = "unknown",
 ) -> dict[str, Any]:
     """Reconcile the vault into the DB and re-render every vault file.
 
     Steps:
       1. Glob every `<repos_dir>/*.md`.
-      2. Parse the frontmatter and pick off `gitpulse_id`, `status`,
+      2. Parse the frontmatter and pick off `nostos_id`, `status`,
          `tags`.
       3. If the repo still exists in the DB, call `writer.apply_edits`
          with the vault-side edits (status / tags replacement).
@@ -509,7 +509,7 @@ def sync_vault(
          state so the file reflects the reconciled truth (upstream
          fields, timestamps, redaction).
 
-    Orphaned vault files (whose `gitpulse_id` does not match any repo
+    Orphaned vault files (whose `nostos_id` does not match any repo
     in the index) are left untouched and reported in `orphans` so the
     operator can decide whether to delete them or re-add the repo.
 
@@ -546,7 +546,7 @@ def sync_vault(
             stats["parse_errors"].append({"path": md_path, "error": str(e)})
             continue
 
-        repo_id = front.get("gitpulse_id")
+        repo_id = front.get("nostos_id")
         if not isinstance(repo_id, int):
             stats["orphans"].append(md_path)
             continue
@@ -597,7 +597,7 @@ def sync_vault(
         upstream = repo.get("upstream")
         notes = repo.get("notes", [])
         export_repo(
-            target, repo, upstream, notes, gitpulse_version=gitpulse_version
+            target, repo, upstream, notes, nostos_version=nostos_version
         )
         stats["files_rewritten"] += 1
 

@@ -46,8 +46,8 @@ def _ok(json_body, headers=None):
 class TestParseRemoteUrl(unittest.TestCase):
     def test_ssh_git_at(self):
         self.assertEqual(
-            parse_remote_url("git@github.com:prodrom3/gitpulse.git"),
-            ("github.com", "prodrom3", "gitpulse"),
+            parse_remote_url("git@github.com:prodrom3/nostos.git"),
+            ("github.com", "prodrom3", "nostos"),
         )
 
     def test_ssh_protocol(self):
@@ -58,14 +58,14 @@ class TestParseRemoteUrl(unittest.TestCase):
 
     def test_https_with_dotgit(self):
         self.assertEqual(
-            parse_remote_url("https://github.com/prodrom3/gitpulse.git"),
-            ("github.com", "prodrom3", "gitpulse"),
+            parse_remote_url("https://github.com/prodrom3/nostos.git"),
+            ("github.com", "prodrom3", "nostos"),
         )
 
     def test_https_no_dotgit(self):
         self.assertEqual(
-            parse_remote_url("https://github.com/prodrom3/gitpulse"),
-            ("github.com", "prodrom3", "gitpulse"),
+            parse_remote_url("https://github.com/prodrom3/nostos"),
+            ("github.com", "prodrom3", "nostos"),
         )
 
     def test_gitlab_subgroup(self):
@@ -108,7 +108,7 @@ class TestGitHubProbe(unittest.TestCase):
             return _ok(repo_body, {"X-RateLimit-Remaining": "4999"})
 
         with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            result = probe.fetch("github.com", "prodrom3", "gitpulse", "ghp_xxx")
+            result = probe.fetch("github.com", "prodrom3", "nostos", "ghp_xxx")
         self.assertEqual(result["stars"], 100)
         self.assertFalse(result["archived"])
         self.assertEqual(result["default_branch"], "main")

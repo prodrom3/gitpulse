@@ -1,4 +1,4 @@
-"""Subcommand modules for gitpulse.
+"""Subcommand modules for nostos.
 
 Each module in this package defines two callables:
 - add_parser(subparsers): register the subparser for the command

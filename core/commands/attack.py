@@ -1,9 +1,9 @@
-"""`gitpulse attack` - ATT&CK technique helpers.
+"""`nostos attack` - ATT&CK technique helpers.
 
 Sub-verbs:
 - `attack list`       print the built-in technique lookup table.
 - `attack tag <repo> T1059 [T1071 ...]`  shorthand for
-  `gitpulse tag <repo> +attack:t1059 +attack:t1071`.
+  `nostos tag <repo> +attack:t1059 +attack:t1071`.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def add_parser(subparsers: Any) -> None:
         "tag",
         help="Tag a repo with one or more ATT&CK technique IDs",
         description=(
-            "Shorthand for `gitpulse tag <repo> +attack:TNNNN`. "
+            "Shorthand for `nostos tag <repo> +attack:TNNNN`. "
             "Each ID is validated against the built-in lookup table."
         ),
     )

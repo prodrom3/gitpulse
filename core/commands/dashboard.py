@@ -1,4 +1,4 @@
-"""`gitpulse dashboard` - generate a static HTML fleet health report."""
+"""`nostos dashboard` - generate a static HTML fleet health report."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def add_parser(subparsers: Any) -> None:
     )
     p.add_argument(
         "--title",
-        default="gitpulse fleet health",
+        default="nostos fleet health",
         help="Page title",
     )
     p.add_argument(

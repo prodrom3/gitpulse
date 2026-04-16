@@ -291,7 +291,7 @@ class TestUpstreamMeta(unittest.TestCase):
                         "provider": "github",
                         "host": "github.com",
                         "owner": "prodrom3",
-                        "name": "gitpulse",
+                        "name": "nostos",
                         "stars": 42,
                         "archived": False,
                         "default_branch": "master",
@@ -467,7 +467,7 @@ class TestListRepoUpstreamFilters(unittest.TestCase):
 
 class TestSchemaMigration(unittest.TestCase):
     def test_upgrade_from_v1_to_current(self):
-        """A DB created by an earlier gitpulse (schema v1) should be
+        """A DB created by an earlier nostos (schema v1) should be
         migrated in place on open, without data loss."""
         with tempfile.TemporaryDirectory() as d:
             db = os.path.join(d, "old.db")
@@ -508,7 +508,7 @@ class TestWatchlistMigration(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _write(self, content: str) -> str:
-        p = os.path.join(self.tmp, ".gitpulse_repos")
+        p = os.path.join(self.tmp, ".nostos_repos")
         with open(p, "w") as f:
             f.write(content)
         return p

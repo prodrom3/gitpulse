@@ -1,6 +1,6 @@
-"""`gitpulse pull` - batch-update the repo fleet.
+"""`nostos pull` - batch-update the repo fleet.
 
-This is the historical behavior of gitpulse. It discovers repositories
+This is the historical behavior of nostos. It discovers repositories
 (via directory scan and/or the index), pulls them concurrently with
 hardening, prints a summary, and exits 0/1. Each touched repo is
 also recorded in / updated against the metadata index so future
@@ -177,7 +177,7 @@ def run(args: argparse.Namespace) -> int:
 
     if getattr(args, "watchlist", False) and not getattr(args, "from_index", False):
         print(
-            "gitpulse: warning: --watchlist is deprecated; use --from-index instead",
+            "nostos: warning: --watchlist is deprecated; use --from-index instead",
             file=sys.stderr,
             flush=True,
         )

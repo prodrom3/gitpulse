@@ -169,7 +169,7 @@ class TestRenderHuman(_IndexTestCase):
             index.add_repo(conn, "/t/new", tags=["recon"])
             digest = _digest.build_digest(conn, since_days=7)
         text = _digest.render_human(digest)
-        self.assertIn("gitpulse digest", text)
+        self.assertIn("nostos digest", text)
         self.assertIn("New intakes", text)
         self.assertIn("Refreshed upstream", text)
         self.assertIn("Currently archived upstream", text)
@@ -191,7 +191,7 @@ class TestDigestCommand(_IndexTestCase):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
             rc = cmd_digest.run(self._args())
         self.assertEqual(rc, 0)
-        self.assertIn("gitpulse digest", out.getvalue())
+        self.assertIn("nostos digest", out.getvalue())
 
     def test_json_output_is_parseable(self):
         with index.connect(self.db) as conn:

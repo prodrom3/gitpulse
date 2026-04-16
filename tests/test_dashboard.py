@@ -34,7 +34,7 @@ class TestRenderHtml(unittest.TestCase):
         }
         html = _dashboard.render_html(digest)
         self.assertIn("<!DOCTYPE html>", html)
-        self.assertIn("gitpulse fleet health", html)
+        self.assertIn("nostos fleet health", html)
         self.assertIn("Total: 0", html)
 
     def test_populated_digest_renders_rows(self):
@@ -105,7 +105,7 @@ class TestDashboardCommand(_IndexTestCase):
     def _args(self, **overrides):
         base = {
             "out": "-",
-            "title": "gitpulse fleet health",
+            "title": "nostos fleet health",
             "since": 7,
             "stale": 90,
             "dormant": 365,

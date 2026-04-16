@@ -1,4 +1,4 @@
-"""Static HTML dashboard generator for gitpulse.
+"""Static HTML dashboard generator for nostos.
 
 Consumes a digest dict (from core.digest.build_digest) and renders
 a self-contained HTML file with inline CSS. No JavaScript framework,
@@ -14,7 +14,7 @@ import html
 from typing import Any
 
 
-def render_html(digest: dict[str, Any], *, title: str = "gitpulse fleet health") -> str:
+def render_html(digest: dict[str, Any], *, title: str = "nostos fleet health") -> str:
     """Produce a standalone HTML string from a digest dict."""
     now = digest.get("generated_at", "")
     counts = digest.get("counts", {})
@@ -216,7 +216,7 @@ _TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <h1>{{TITLE}}</h1>
-<p class="meta">Generated {{GENERATED}} by gitpulse</p>
+<p class="meta">Generated {{GENERATED}} by nostos</p>
 {{BODY}}
 </body>
 </html>

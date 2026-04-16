@@ -1,4 +1,4 @@
-"""`gitpulse doctor` - index health check and optional auto-fix."""
+"""`nostos doctor` - index health check and optional auto-fix."""
 
 from __future__ import annotations
 

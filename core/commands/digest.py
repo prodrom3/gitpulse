@@ -1,4 +1,4 @@
-"""`gitpulse digest` - weekly changeset report over the local index."""
+"""`nostos digest` - weekly changeset report over the local index."""
 
 from __future__ import annotations
 

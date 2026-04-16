@@ -1,8 +1,8 @@
-#compdef gitpulse gitpulse.py
-# Zsh completion for gitpulse
+#compdef nostos nostos.py
+# Zsh completion for nostos
 # Add this directory to fpath or copy to a directory in $fpath:
 #
-#   fpath=(/path/to/gitpulse/extras/completion $fpath)
+#   fpath=(/path/to/nostos/extras/completion $fpath)
 #   autoload -Uz compinit && compinit
 
 local -a verbs
@@ -20,13 +20,13 @@ verbs=(
     'vault:Bridge the metadata index with an Obsidian vault'
     'export:Write a portable JSON bundle of the metadata index'
     'import:Load a portable JSON bundle into the metadata index'
-    'update:Check for or apply a gitpulse self-update'
+    'update:Check for or apply a nostos self-update'
 )
 
 local -a statuses
 statuses=(new reviewed in-use dropped flagged)
 
-_gitpulse() {
+_nostos() {
     local curcontext="$curcontext" state line
 
     _arguments -C \
@@ -160,4 +160,4 @@ _gitpulse() {
     esac
 }
 
-_gitpulse "$@"
+_nostos "$@"

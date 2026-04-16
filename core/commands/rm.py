@@ -1,4 +1,4 @@
-"""`gitpulse rm` - remove a repo from the metadata index.
+"""`nostos rm` - remove a repo from the metadata index.
 
 The clone on disk is left untouched unless --purge is given. When
 --cleanup-vault is given (or implied by --purge), the corresponding

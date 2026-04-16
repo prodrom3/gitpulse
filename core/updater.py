@@ -242,7 +242,7 @@ class SSHMultiplexer:
         if not shutil.which("ssh"):
             self.enabled = False
             return
-        self.control_dir = tempfile.mkdtemp(prefix="gitpulse-ssh-")
+        self.control_dir = tempfile.mkdtemp(prefix="nostos-ssh-")
         control_path = os.path.join(self.control_dir, "%h_%p_%r")
         ssh_cmd = (
             f'ssh -o ControlMaster=auto'

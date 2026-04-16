@@ -1,4 +1,4 @@
-"""`gitpulse export` - write a portable JSON bundle of the metadata index."""
+"""`nostos export` - write a portable JSON bundle of the metadata index."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def run(args: argparse.Namespace) -> int:
             bundle = portable.build_bundle(
                 conn,
                 redact=args.redact,
-                gitpulse_version=_get_version(),
+                nostos_version=_get_version(),
             )
     except OSError as e:
         return fail(str(e))

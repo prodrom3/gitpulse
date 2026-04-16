@@ -1,4 +1,4 @@
-"""`gitpulse note` - append a timestamped note to a repository."""
+"""`nostos note` - append a timestamped note to a repository."""
 
 from __future__ import annotations
 

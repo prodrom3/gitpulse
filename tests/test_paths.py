@@ -29,11 +29,11 @@ class TestXdgResolution(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=True):
             self.assertTrue(paths.xdg_data_home().endswith("/.local/share"))
 
-    def test_config_dir_ends_with_gitpulse(self):
-        self.assertTrue(paths.config_dir().endswith("gitpulse"))
+    def test_config_dir_ends_with_nostos(self):
+        self.assertTrue(paths.config_dir().endswith("nostos"))
 
-    def test_data_dir_ends_with_gitpulse(self):
-        self.assertTrue(paths.data_dir().endswith("gitpulse"))
+    def test_data_dir_ends_with_nostos(self):
+        self.assertTrue(paths.data_dir().endswith("nostos"))
 
     def test_index_db_is_inside_data_dir(self):
         self.assertTrue(paths.index_db_path().startswith(paths.data_dir()))
@@ -68,7 +68,7 @@ class TestEnsureDirs(unittest.TestCase):
             self.skipTest("Unix-only perm check")
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": tmp}):
-                loose = os.path.join(tmp, "gitpulse")
+                loose = os.path.join(tmp, "nostos")
                 os.makedirs(loose, mode=0o755)
                 os.chmod(loose, 0o755)
                 paths.ensure_config_dir()

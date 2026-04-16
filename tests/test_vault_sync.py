@@ -26,9 +26,9 @@ class TestParseFrontmatter(unittest.TestCase):
             vault.parse_frontmatter("no frontmatter here\n")
 
     def test_parses_scalars(self):
-        text = '---\ngitpulse_id: 7\nstatus: "in-use"\nquiet: false\n---\nbody\n'
+        text = '---\nnostos_id: 7\nstatus: "in-use"\nquiet: false\n---\nbody\n'
         front, body = vault.parse_frontmatter(text)
-        self.assertEqual(front["gitpulse_id"], 7)
+        self.assertEqual(front["nostos_id"], 7)
         self.assertEqual(front["status"], "in-use")
         self.assertEqual(front["quiet"], False)
         self.assertEqual(body, "body\n")
@@ -46,7 +46,7 @@ class TestParseFrontmatter(unittest.TestCase):
     def test_parses_block_tag_list(self):
         text = (
             "---\n"
-            "gitpulse_id: 1\n"
+            "nostos_id: 1\n"
             "tags:\n"
             "  - c2\n"
             "  - recon\n"
@@ -60,7 +60,7 @@ class TestParseFrontmatter(unittest.TestCase):
     def test_skips_nested_upstream_block(self):
         text = (
             "---\n"
-            "gitpulse_id: 42\n"
+            "nostos_id: 42\n"
             "status: \"in-use\"\n"
             "upstream:\n"
             '  provider: "github"\n'
@@ -69,7 +69,7 @@ class TestParseFrontmatter(unittest.TestCase):
             "---\n"
         )
         front, _ = vault.parse_frontmatter(text)
-        self.assertEqual(front["gitpulse_id"], 42)
+        self.assertEqual(front["nostos_id"], 42)
         self.assertEqual(front["tags"], ["x"])
         # upstream sub-keys are deliberately NOT surfaced; DB wins there.
         self.assertNotIn("upstream", front)
@@ -125,7 +125,7 @@ class TestParseFrontmatter(unittest.TestCase):
         """Anything our writer emits must parse back to equivalent data."""
         written = vault._render_frontmatter(
             {
-                "gitpulse_id": 9,
+                "nostos_id": 9,
                 "path": "/tmp/foo",
                 "status": "in-use",
                 "quiet": False,
@@ -134,7 +134,7 @@ class TestParseFrontmatter(unittest.TestCase):
             }
         )
         front, body = vault.parse_frontmatter(written + "\nbody\n")
-        self.assertEqual(front["gitpulse_id"], 9)
+        self.assertEqual(front["nostos_id"], 9)
         self.assertEqual(front["status"], "in-use")
         self.assertEqual(front["quiet"], False)
         self.assertEqual(front["tags"], ["c2", "post-ex"])
@@ -216,7 +216,7 @@ class TestSyncVault(unittest.TestCase):
         self._write_md(
             "a",
             {
-                "gitpulse_id": 1,
+                "nostos_id": 1,
                 "status": "in-use",
                 "tags": ["c2", "post-ex"],
             },
@@ -234,7 +234,7 @@ class TestSyncVault(unittest.TestCase):
         self.assertEqual(writer.calls[0]["tags"], ["c2", "post-ex"])
 
     def test_invalid_status_reported_as_parse_error(self):
-        self._write_md("a", {"gitpulse_id": 1, "status": "not-a-status"})
+        self._write_md("a", {"nostos_id": 1, "status": "not-a-status"})
         writer = _FakeWriter(known_ids=[1])
         reader = _FakeReader([self._stub_repo(1, "/tmp/a")])
         stats = vault.sync_vault(self.target, reader, writer)
@@ -242,7 +242,7 @@ class TestSyncVault(unittest.TestCase):
         self.assertIn("invalid status", stats["parse_errors"][0]["error"])
 
     def test_orphan_file_collected(self):
-        self._write_md("a", {"gitpulse_id": 9999, "status": "in-use"})
+        self._write_md("a", {"nostos_id": 9999, "status": "in-use"})
         writer = _FakeWriter(known_ids=[])  # id 9999 not in DB
         reader = _FakeReader([])
         stats = vault.sync_vault(self.target, reader, writer)
@@ -259,7 +259,7 @@ class TestSyncVault(unittest.TestCase):
         self.assertEqual(len(stats["parse_errors"]), 1)
 
     def test_rewrites_from_reconciled_reader(self):
-        self._write_md("a", {"gitpulse_id": 1, "status": "in-use", "tags": ["c2"]})
+        self._write_md("a", {"nostos_id": 1, "status": "in-use", "tags": ["c2"]})
         # Reader returns the reconciled state (simulated)
         reader = _FakeReader([
             self._stub_repo(1, "/tmp/a", tags=["c2"], status="in-use"),
@@ -335,7 +335,7 @@ class TestVaultSyncCommand(_IndexBackedTestCase):
             original = f.read()
         # Write back a version with edited status + tags.
         edited_front = {
-            "gitpulse_id": rid,
+            "nostos_id": rid,
             "path": "/t/a",
             "status": "in-use",
             "tags": ["new-tag", "second"],

@@ -1,4 +1,4 @@
-"""Index health checks for `gitpulse doctor`.
+"""Index health checks for `nostos doctor`.
 
 Runs a battery of read-only checks against the metadata index and
 (optionally) the vault directory, reporting issues the operator should
@@ -8,7 +8,7 @@ Checks performed
 - stale_paths:     repos whose indexed path no longer exists on disk.
 - missing_remote:  repos with no remote_url recorded.
 - missing_upstream: repos with no upstream_meta row (never refreshed).
-- orphan_vault:    vault .md files whose gitpulse_id has no matching
+- orphan_vault:    vault .md files whose nostos_id has no matching
                    repo in the index.
 - duplicate_tags:  tags that differ only by case (data-model quirk;
                    tags are lowercased on write but older imports may
@@ -108,7 +108,7 @@ def _check_orphan_vault(
     vault_path: str | None,
     vault_subdir: str,
 ) -> list[str]:
-    """Find vault .md files whose gitpulse_id does not match any repo."""
+    """Find vault .md files whose nostos_id does not match any repo."""
     if not vault_path:
         return []
     repos_dir = os.path.join(
@@ -130,7 +130,7 @@ def _check_orphan_vault(
             with open(md_path, encoding="utf-8") as f:
                 text = f.read()
             front, _ = _vault.parse_frontmatter(text)
-            gp_id = front.get("gitpulse_id")
+            gp_id = front.get("nostos_id")
             if not isinstance(gp_id, int) or gp_id not in repo_ids:
                 orphans.append(md_path)
         except (OSError, _vault.FrontmatterError):
@@ -155,7 +155,7 @@ def render_human(report: dict[str, Any]) -> str:
     """Render the doctor report as readable text."""
     out: list[str] = []
     out.append(
-        f"gitpulse doctor - schema v{report['schema_version']}, "
+        f"nostos doctor - schema v{report['schema_version']}, "
         f"DB {report['db_size_bytes']:,} bytes, "
         f"{report['total_repos']} repo(s)"
     )
@@ -170,25 +170,25 @@ def render_human(report: dict[str, Any]) -> str:
         out.append(f"  Stale paths ({len(report['stale_paths'])}):")
         for e in report["stale_paths"][:20]:
             out.append(f"    id={e['id']}  {e['path']}")
-        out.append("    fix: gitpulse doctor --fix flags these as 'flagged'")
+        out.append("    fix: nostos doctor --fix flags these as 'flagged'")
 
     if report["missing_remote"]:
         out.append(f"\n  Missing remote_url ({len(report['missing_remote'])}):")
         for e in report["missing_remote"][:20]:
             out.append(f"    id={e['id']}  {e['path']}")
-        out.append("    fix: gitpulse show <id> and add the remote manually if needed")
+        out.append("    fix: nostos show <id> and add the remote manually if needed")
 
     if report["missing_upstream"]:
         out.append(f"\n  Never refreshed ({len(report['missing_upstream'])}):")
         for e in report["missing_upstream"][:20]:
             out.append(f"    id={e['id']}  {e['path']}")
-        out.append("    fix: gitpulse refresh")
+        out.append("    fix: nostos refresh")
 
     if report["orphan_vault_files"]:
         out.append(f"\n  Orphan vault files ({len(report['orphan_vault_files'])}):")
         for p in report["orphan_vault_files"][:20]:
             out.append(f"    {p}")
-        out.append("    fix: gitpulse doctor --fix deletes these")
+        out.append("    fix: nostos doctor --fix deletes these")
 
     if report["duplicate_tags"]:
         out.append(f"\n  Duplicate tags by case ({len(report['duplicate_tags'])}):")

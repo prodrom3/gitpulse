@@ -1,4 +1,4 @@
-"""Portable export / import bundle for the gitpulse metadata index.
+"""Portable export / import bundle for the nostos metadata index.
 
 A bundle is a schema-versioned JSON document capturing enough state
 to recreate the index on another machine. It carries repos, tags,
@@ -20,7 +20,7 @@ Security / opsec
 - Redacted bundles carry `redacted: true` in the top-level envelope
   so downstream consumers can tell at a glance.
 - The stable schema number protects against silently loading a bundle
-  from a gitpulse version that expects fields we do not write.
+  from a nostos version that expects fields we do not write.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def build_bundle(
     conn: sqlite3.Connection,
     *,
     redact: bool = False,
-    gitpulse_version: str = "unknown",
+    nostos_version: str = "unknown",
 ) -> dict[str, Any]:
     """Build a portable bundle dict from the live index.
 
@@ -88,7 +88,7 @@ def build_bundle(
     return {
         "schema": CURRENT_EXPORT_SCHEMA,
         "exported_at": _now_utc(),
-        "gitpulse_version": gitpulse_version,
+        "nostos_version": nostos_version,
         "redacted": redact,
         "repos": out_repos,
     }
@@ -134,7 +134,7 @@ def validate_bundle(bundle: dict[str, Any]) -> None:
     if schema != CURRENT_EXPORT_SCHEMA:
         raise BundleError(
             f"unsupported bundle schema: {schema!r} "
-            f"(this gitpulse reads schema {CURRENT_EXPORT_SCHEMA})"
+            f"(this nostos reads schema {CURRENT_EXPORT_SCHEMA})"
         )
     if not isinstance(bundle.get("repos"), list):
         raise BundleError("bundle.repos must be a JSON array")
@@ -239,7 +239,7 @@ def import_bundle(
 
         if upstream:
             # Take the bundle's upstream record at face value; the
-            # operator can run `gitpulse refresh` afterwards to rebuild
+            # operator can run `nostos refresh` afterwards to rebuild
             # it from live providers if desired.
             _index.upsert_upstream_meta(conn, path, upstream)
             stats["upstream_set"] += 1

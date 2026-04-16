@@ -18,9 +18,9 @@ class TestSlug(unittest.TestCase):
     def test_slug_from_upstream(self):
         slug = vault.repo_slug(
             {"path": "/tmp/x"},
-            {"owner": "Prodrom3", "name": "GitPulse"},
+            {"owner": "Prodrom3", "name": "Nostos"},
         )
-        self.assertEqual(slug, "prodrom3-gitpulse")
+        self.assertEqual(slug, "prodrom3-nostos")
 
     def test_slug_without_upstream_uses_basename(self):
         slug = vault.repo_slug({"path": "/home/user/tools/My-Repo"}, None)
@@ -78,12 +78,12 @@ class TestRenderMarkdown(unittest.TestCase):
             self._repo(),
             self._upstream(),
             [],
-            gitpulse_version="2.3.0",
+            nostos_version="2.3.0",
         )
         self.assertTrue(md.startswith("---\n"))
         # Closing --- on its own line followed by body
         self.assertIn("\n---\n", md[4:])
-        self.assertIn('gitpulse_id: 42', md)
+        self.assertIn('nostos_id: 42', md)
         self.assertIn('status: "in-use"', md)
         self.assertIn("tags: [", md)
         self.assertIn("upstream:", md)
@@ -168,7 +168,7 @@ class TestExportRepo(unittest.TestCase):
         self.assertTrue(os.path.isfile(path))
         self.assertEqual(os.path.basename(path), "foo.md")
         with open(path) as f:
-            self.assertIn("gitpulse_id: 1", f.read())
+            self.assertIn("nostos_id: 1", f.read())
 
     def test_creates_repos_dir_with_0700(self):
         target = self._target()
@@ -210,7 +210,7 @@ class TestExportRepo(unittest.TestCase):
 
 
 class TestExportCommand(unittest.TestCase):
-    """End-to-end for `gitpulse vault export` against a real DB."""
+    """End-to-end for `nostos vault export` against a real DB."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

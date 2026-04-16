@@ -18,7 +18,7 @@ class TestGetVersion(unittest.TestCase):
         from importlib.metadata import PackageNotFoundError
 
         with mock.patch(
-            "core.cli._pkg_version", side_effect=PackageNotFoundError("gitpulse")
+            "core.cli._pkg_version", side_effect=PackageNotFoundError("nostos")
         ), mock.patch("builtins.open", side_effect=OSError("not found")):
             self.assertEqual(get_version(), "unknown")
 
@@ -44,7 +44,7 @@ class TestPullParser(unittest.TestCase):
         }
         if config_overrides:
             mock_config.return_value.update(config_overrides)
-        with mock.patch("sys.argv", ["gitpulse"] + list(argv)):
+        with mock.patch("sys.argv", ["nostos"] + list(argv)):
             return _parse(argv)
 
     def test_default_verb_is_pull(self):

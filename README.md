@@ -1,16 +1,16 @@
-# gitpulse
+# nostos
 
-[![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
+[![CI](https://github.com/prodrom3/nostos/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/nostos/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.8.0-orange.svg)](./VERSION)
-[![PyPI](https://img.shields.io/pypi/v/gitpulse.svg)](https://pypi.org/project/gitpulse/)
+[![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)](./VERSION)
+[![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
-> **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
+> **nostos** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
 
 <p align="center">
-  <img width="420" height="420" src="https://github.com/prodrom3/gitpulse/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d" alt="gitpulse logo">
+  <img width="420" height="420" src="https://github.com/prodrom3/nostos/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d" alt="nostos logo">
 </p>
 
 ---
@@ -26,7 +26,7 @@
   - [Requirements](#requirements)
   - [Verifying the install](#verifying-the-install)
 
-**Using gitpulse**
+**Using nostos**
 - [Usage](#usage)
   - [CLI reference](#cli-reference)
   - [Examples](#examples)
@@ -40,7 +40,7 @@
   - [Migration from the legacy watchlist](#migration-from-the-legacy-watchlist)
 - [Upstream probes](#upstream-probes)
   - [Supported providers](#supported-providers)
-  - [Auth config: ~/.config/gitpulse/auth.toml](#auth-config-configgitpulseauthtoml)
+  - [Auth config: ~/.config/nostos/auth.toml](#auth-config-confignostosauthtoml)
   - [Commands](#commands)
   - [Probe flow](#probe-flow)
   - [Opsec invariants](#opsec-invariants)
@@ -85,7 +85,7 @@
 
 ## Overview
 
-gitpulse is three tools in one:
+nostos is three tools in one:
 
 1. A **batch-pull engine** that walks a directory tree (and/or the metadata index), discovers every git repository it can reach, and updates them concurrently. Predictable in batch: repositories with uncommitted changes, detached HEADs, or missing upstreams are reported and skipped, never overwritten. Hung operations are terminated on a configurable timeout, and every run leaves a timestamped log behind for audit.
 2. A **metadata index** (SQLite) that records identity, provenance, tags, notes, and triage status for every repository in the fleet. Designed for teams that ingest many new GitHub projects each week and need to stay on top of what they have, where it came from, and what still matters.
@@ -95,13 +95,13 @@ gitpulse is three tools in one:
 
 | Capability | Summary |
 | --- | --- |
-| **Metadata index** | SQLite at `$XDG_DATA_HOME/gitpulse/index.db` (0600, WAL, secure_delete). One row per repo plus tags, notes, provenance, triage status. |
-| **Upstream probes** | `gitpulse refresh` fetches archived / stars / last push / latest release for GitHub, GitLab, Gitea (hosted + self-hosted). Opsec-gated by `~/.config/gitpulse/auth.toml`; unconfigured hosts are never contacted. |
-| **Supply-chain early warning** | `gitpulse list --upstream-archived` surfaces tools whose upstream has been archived (ownership change, takedown). |
-| **Staleness view** | `gitpulse list --upstream-dormant 365` lists upstreams with no push in a year; `--upstream-stale 30` finds entries whose local cache is behind. |
-| **Ingest workflow** | `gitpulse add <url>` clones (hardened) and records source, tags, note, status in one step. |
-| **Triage queue** | `gitpulse triage` walks newly-added repos and classifies them interactively. |
-| **Fleet search** | `gitpulse list --tag c2 --untouched-over 90` answers operational questions in milliseconds. |
+| **Metadata index** | SQLite at `$XDG_DATA_HOME/nostos/index.db` (0600, WAL, secure_delete). One row per repo plus tags, notes, provenance, triage status. |
+| **Upstream probes** | `nostos refresh` fetches archived / stars / last push / latest release for GitHub, GitLab, Gitea (hosted + self-hosted). Opsec-gated by `~/.config/nostos/auth.toml`; unconfigured hosts are never contacted. |
+| **Supply-chain early warning** | `nostos list --upstream-archived` surfaces tools whose upstream has been archived (ownership change, takedown). |
+| **Staleness view** | `nostos list --upstream-dormant 365` lists upstreams with no push in a year; `--upstream-stale 30` finds entries whose local cache is behind. |
+| **Ingest workflow** | `nostos add <url>` clones (hardened) and records source, tags, note, status in one step. |
+| **Triage queue** | `nostos triage` walks newly-added repos and classifies them interactively. |
+| **Fleet search** | `nostos list --tag c2 --untouched-over 90` answers operational questions in milliseconds. |
 | **Parallel updates** | Producer / consumer thread pool with configurable worker count. |
 | **Safe-by-default** | Dirty trees, detached HEADs, and untracked branches are skipped, never merged into. |
 | **Remote safe-clone** | `add <url>` uses `--no-checkout` + `GIT_CONFIG_*` to disable hooks (CVE-2024-32002 / 32004 / 32465 mitigated). |
@@ -110,7 +110,7 @@ gitpulse is three tools in one:
 | **SSH multiplexing** | ControlMaster reuses a single SSH session across repositories on the same host (Unix). |
 | **Exclude patterns** | `--exclude 'archived-*' 'vendor-*'` - glob-based filtering. |
 | **Timeout protection** | Kills hung git operations after N seconds. |
-| **Config file** | Persistent defaults in `~/.gitpulserc`; CLI flags always override. |
+| **Config file** | Persistent defaults in `~/.nostosrc`; CLI flags always override. |
 | **JSON output** | Stable machine-readable schema on every list / show / pull / refresh command. |
 | **Graceful interruption** | Ctrl+C cancels pending work and prints a partial summary. |
 | **Hardened logging** | Timestamped, rotated logs (0600 perms); credentials stripped from output. |
@@ -128,21 +128,21 @@ gitpulse is three tools in one:
 ## Quick Start
 
 ```bash
-git clone https://github.com/prodrom3/gitpulse.git
-cd gitpulse
+git clone https://github.com/prodrom3/nostos.git
+cd nostos
 
 # Preview: what would be updated under the current directory?
-python gitpulse.py --dry-run
+python nostos.py --dry-run
 
 # Update every repo under a given path, 16 workers, 60s timeout
-python gitpulse.py ~/projects --workers 16 --timeout 60
+python nostos.py ~/projects --workers 16 --timeout 60
 
 # Ingest a new tool you just heard about, then triage this week's intake
-python gitpulse.py add https://github.com/org/new-tool.git --tag recon
-python gitpulse.py triage
+python nostos.py add https://github.com/org/new-tool.git --tag recon
+python nostos.py triage
 
 # Answer "what c2 tools do I have that I haven't touched in 90 days?"
-python gitpulse.py list --tag c2 --untouched-over 90
+python nostos.py list --tag c2 --untouched-over 90
 ```
 
 No packages, virtualenvs, or build steps required - only Python 3.10+ and `git`.
@@ -156,51 +156,51 @@ No packages, virtualenvs, or build steps required - only Python 3.10+ and `git`.
 | Component | Minimum | Recommended | Notes |
 | --- | --- | --- | --- |
 | Python | 3.10 | 3.12+ | No third-party runtime dependencies. |
-| Git | 2.25 | **2.45.1+** | gitpulse warns at startup on versions affected by CVE-2024-32002 / 32004 / 32465. |
+| Git | 2.25 | **2.45.1+** | nostos warns at startup on versions affected by CVE-2024-32002 / 32004 / 32465. |
 | OS | Linux / macOS / Windows | - | SSH multiplexing is Unix-only; all other features are cross-platform. |
 
 ### Option 1 - Run directly from source
 
 ```bash
-git clone https://github.com/prodrom3/gitpulse.git
-cd gitpulse
-python gitpulse.py --help
+git clone https://github.com/prodrom3/nostos.git
+cd nostos
+python nostos.py --help
 ```
 
 ### Option 2 - Install as a system command
 
 ```bash
-git clone https://github.com/prodrom3/gitpulse.git
-cd gitpulse
+git clone https://github.com/prodrom3/nostos.git
+cd nostos
 pip install .
-gitpulse --help     # available on $PATH
+nostos --help     # available on $PATH
 ```
 
 ### Option 3 - Install into an isolated environment
 
 ```bash
-pipx install git+https://github.com/prodrom3/gitpulse.git
+pipx install git+https://github.com/prodrom3/nostos.git
 ```
 
 ### Verifying the install
 
 ```bash
-gitpulse --version        # prints the package version
-gitpulse --help           # prints usage
+nostos --version        # prints the package version
+nostos --help           # prints usage
 ```
 
 ### Shell tab-completion (optional)
 
-gitpulse supports tab-completion for all verbs and flags via [argcomplete](https://kislyuk.github.io/argcomplete/). This is entirely opt-in; gitpulse has no hard dependency on it.
+nostos supports tab-completion for all verbs and flags via [argcomplete](https://kislyuk.github.io/argcomplete/). This is entirely opt-in; nostos has no hard dependency on it.
 
-**1. Install argcomplete into the same environment as gitpulse:**
+**1. Install argcomplete into the same environment as nostos:**
 
 ```bash
 # pipx install
-pipx inject gitpulse argcomplete
+pipx inject nostos argcomplete
 
 # venv install
-pip install 'gitpulse[completion]'
+pip install 'nostos[completion]'
 
 # system-wide via your package manager (examples)
 sudo apt install python3-argcomplete     # Debian / Ubuntu / Kali
@@ -216,7 +216,7 @@ brew install argcomplete                 # macOS (Homebrew)
 activate-global-python-argcomplete --user
 
 # or per-command in ~/.bashrc
-eval "$(register-python-argcomplete gitpulse)"
+eval "$(register-python-argcomplete nostos)"
 ```
 
 **zsh** (Kali default, macOS default since Catalina):
@@ -224,41 +224,41 @@ eval "$(register-python-argcomplete gitpulse)"
 ```bash
 # Add to ~/.zshrc once
 autoload -U bashcompinit && bashcompinit
-eval "$(register-python-argcomplete gitpulse)"
+eval "$(register-python-argcomplete nostos)"
 ```
 
 Then open a new shell (or `source ~/.zshrc` / `source ~/.bashrc`) and try:
 
 ```bash
-gitpulse <TAB><TAB>          # lists all verbs
-gitpulse pull --<TAB><TAB>   # lists all pull flags
+nostos <TAB><TAB>          # lists all verbs
+nostos pull --<TAB><TAB>   # lists all pull flags
 ```
 
 **fish:**
 
 ```fish
-register-python-argcomplete --shell fish gitpulse | source
+register-python-argcomplete --shell fish nostos | source
 ```
 
 Add the same line to `~/.config/fish/config.fish` to persist.
 
-**Windows PowerShell / cmd:** argcomplete does not officially support native Windows shells. Use Git Bash, WSL, or Windows Terminal + WSL for tab-completion. Everything else in gitpulse works fine on native Windows.
+**Windows PowerShell / cmd:** argcomplete does not officially support native Windows shells. Use Git Bash, WSL, or Windows Terminal + WSL for tab-completion. Everything else in nostos works fine on native Windows.
 
 If tab-completion isn't firing after setup, verify argcomplete can see the marker:
 
 ```bash
 python -c "import argcomplete, sys; print(argcomplete.__version__)"
-grep -l PYTHON_ARGCOMPLETE_OK $(which gitpulse)
+grep -l PYTHON_ARGCOMPLETE_OK $(which nostos)
 ```
 
 ---
 
 ## Usage
 
-gitpulse is a verb-first CLI: `gitpulse <verb> [args]`. Invocations without a verb are treated as an implicit `pull` so every prior script / CI pipeline keeps working.
+nostos is a verb-first CLI: `nostos <verb> [args]`. Invocations without a verb are treated as an implicit `pull` so every prior script / CI pipeline keeps working.
 
 ```
-gitpulse [verb] [options]
+nostos [verb] [options]
 ```
 
 | Verb | Purpose |
@@ -276,7 +276,7 @@ gitpulse [verb] [options]
 | `vault sync` | Read operator edits to `status` / `tags` in the vault back into the DB, then regenerate every file. |
 | `export` | Write a schema-versioned JSON bundle of the index (portable; supports redaction). |
 | `import` | Load a bundle into the index (merge by default; `--replace` wipes; `--remap` rewrites paths). |
-| `update` | Check for / apply a gitpulse self-update. Auto-detects source clone / pipx / pip. |
+| `update` | Check for / apply a nostos self-update. Auto-detects source clone / pipx / pip. |
 | `doctor` | Index health check: stale paths, missing remotes, orphan vault files. `--fix` auto-remediates. |
 | `attack list` | Print the built-in MITRE ATT&CK technique lookup table. |
 | `attack tag` | Tag a repo with ATT&CK technique IDs (shorthand for `+attack:TNNNN`). |
@@ -286,7 +286,7 @@ gitpulse [verb] [options]
 
 Every verb supports `--help`. Common flags are summarised below.
 
-#### `gitpulse pull` (default)
+#### `nostos pull` (default)
 
 | Flag | Default | Description |
 | --- | --- | --- |
@@ -304,7 +304,7 @@ Every verb supports `--help`. Common flags are summarised below.
 
 Every touched repo is automatically registered in the metadata index and its `last_touched_at` is updated, so `list` / `show` / `triage` reflect reality without extra effort.
 
-#### `gitpulse add PATH_OR_URL`
+#### `nostos add PATH_OR_URL`
 
 | Flag | Description |
 | --- | --- |
@@ -315,7 +315,7 @@ Every touched repo is automatically registered in the metadata index and its `la
 | `--quiet-upstream` | Opsec flag: never query upstream metadata for this repo (Phase 2). |
 | `--clone-dir DIR` | When the target is a URL, clone into this directory. |
 
-#### `gitpulse list`
+#### `nostos list`
 
 | Flag | Description |
 | --- | --- |
@@ -324,69 +324,69 @@ Every touched repo is automatically registered in the metadata index and its `la
 | `--untouched-over DAYS` | Only repos not pulled / shown in the last `DAYS` days. |
 | `--json` | Emit a JSON document instead of a coloured table. |
 
-#### `gitpulse show PATH_OR_ID`, `tag`, `note`, `triage`, `rm`
+#### `nostos show PATH_OR_ID`, `tag`, `note`, `triage`, `rm`
 
-See `gitpulse <verb> --help` for the full surface of each. Notable: `tag` takes `+t` / `-t` / bare `t` tokens; `rm --purge --yes` deletes the clone on disk after explicit confirmation.
+See `nostos <verb> --help` for the full surface of each. Notable: `tag` takes `+t` / `-t` / bare `t` tokens; `rm --purge --yes` deletes the clone on disk after explicit confirmation.
 
 ### Examples
 
 ```bash
-# --- Batch pull (the original gitpulse) ---
+# --- Batch pull (the original nostos) ---
 
 # Update everything under the current directory
-gitpulse
+nostos
 
 # Update repos under a specific path
-gitpulse ~/projects
+nostos ~/projects
 
 # Preview which repos would be updated
-gitpulse --dry-run
+nostos --dry-run
 
 # Check what's new across all repos without merging
-gitpulse --fetch-only
+nostos --fetch-only
 
 # Rebase-style updates, 16 workers, 60s timeout
-gitpulse --rebase --workers 16 --timeout 60
+nostos --rebase --workers 16 --timeout 60
 
 # Pull every repo registered in the metadata index
-gitpulse pull --from-index
+nostos pull --from-index
 
 # JSON output for scripting
-gitpulse --json | jq '.counts'
+nostos --json | jq '.counts'
 
 # --- Metadata workflow (ingest -> triage -> use) ---
 
 # Ingest a new tool pointed out in a blog post
-gitpulse add https://github.com/org/recon-tool.git \
+nostos add https://github.com/org/recon-tool.git \
   --tag recon,passive \
   --source "blog:orange.tw, 2026-04-12" \
   --note "mentioned for OOB DNS recon"
 
 # List everything tagged c2 that you haven't opened in 90 days
-gitpulse list --tag c2 --untouched-over 90
+nostos list --tag c2 --untouched-over 90
 
 # Walk through this week's intake
-gitpulse triage
+nostos triage
 
 # Look up one tool
-gitpulse show org/recon-tool
+nostos show org/recon-tool
 
 # Quick tag adjustments
-gitpulse tag ~/tools/recon-tool +passive -old
+nostos tag ~/tools/recon-tool +passive -old
 
 # Flag an upstream-compromised tool
-gitpulse tag /tools/suspect +flagged
-gitpulse note /tools/suspect "upstream owner changed 2026-04-09"
+nostos tag /tools/suspect +flagged
+nostos note /tools/suspect "upstream owner changed 2026-04-09"
 
 # Retire something
-gitpulse rm ~/tools/obsolete-thing --purge --yes
+nostos rm ~/tools/obsolete-thing --purge --yes
 ```
 
 ---
 
 ## Configuration
 
-gitpulse reads an optional INI file at `~/.gitpulserc`. CLI flags always take precedence over file values.
+nostos reads an optional INI file at `~/.nostosrc`. CLI flags always take precedence over file values.
 
 ```ini
 [defaults]
@@ -410,14 +410,14 @@ patterns = archived-*, .backup-*, vendor-*
 ### Precedence (highest to lowest)
 
 1. Command-line flags
-2. `~/.gitpulserc`
+2. `~/.nostosrc`
 3. Built-in defaults
 
 ---
 
 ## Metadata index
 
-gitpulse keeps a **metadata index** - a single SQLite file at `$XDG_DATA_HOME/gitpulse/index.db` (default `~/.local/share/gitpulse/index.db`) - that records one row per repository plus tags, free-text notes, provenance, and triage status. Every verb in the CLI reads from and writes to this index; batch `pull` automatically registers every touched repo.
+nostos keeps a **metadata index** - a single SQLite file at `$XDG_DATA_HOME/nostos/index.db` (default `~/.local/share/nostos/index.db`) - that records one row per repository plus tags, free-text notes, provenance, and triage status. Every verb in the CLI reads from and writes to this index; batch `pull` automatically registers every touched repo.
 
 ### Layout
 
@@ -438,17 +438,17 @@ The index reveals the operator's full toolchain. It is treated as an intelligenc
 - DB file is created `0600` on Unix; parent directory `0700`.
 - PRAGMAs on every connection: `journal_mode=WAL`, `secure_delete=ON`, `foreign_keys=ON`. Deleted rows are overwritten on disk, not just marked free.
 - The file lives **outside** any repository, under XDG. An accidental `git add .` cannot pick it up.
-- For at-rest confidentiality, put `$XDG_DATA_HOME/gitpulse/` on an encrypted volume (LUKS / FileVault / BitLocker). gitpulse ships no built-in encryption; disk-layer protection is the right layer for this threat model.
+- For at-rest confidentiality, put `$XDG_DATA_HOME/nostos/` on an encrypted volume (LUKS / FileVault / BitLocker). nostos ships no built-in encryption; disk-layer protection is the right layer for this threat model.
 
 ### Recommended intake workflow
 
 ```mermaid
 flowchart LR
     intel[Blog / tweet /<br/>colleague pointer]
-    add[gitpulse add URL<br/>--tag recon,passive<br/>--source 'blog:...']
-    triage[gitpulse triage<br/>classify, tag, note]
-    list[gitpulse list<br/>--tag c2<br/>--untouched-over 90]
-    pull[gitpulse pull<br/>--from-index]
+    add[nostos add URL<br/>--tag recon,passive<br/>--source 'blog:...']
+    triage[nostos triage<br/>classify, tag, note]
+    list[nostos list<br/>--tag c2<br/>--untouched-over 90]
+    pull[nostos pull<br/>--from-index]
 
     intel --> add --> triage --> list
     list --> pull
@@ -457,17 +457,17 @@ flowchart LR
 
 ### Migration from the legacy watchlist
 
-The old `~/.gitpulse_repos` file is imported on first run of any verb (`source='legacy-watchlist'`, `status='reviewed'`) and then renamed to `~/.gitpulse_repos.migrated`. The operation is idempotent. The legacy top-level flags `--add`, `--remove`, `--list`, and `--watchlist` keep working for one release and emit a one-line deprecation notice mapping them to their new verbs.
+The old `~/.nostos_repos` file is imported on first run of any verb (`source='legacy-watchlist'`, `status='reviewed'`) and then renamed to `~/.nostos_repos.migrated`. The operation is idempotent. The legacy top-level flags `--add`, `--remove`, `--list`, and `--watchlist` keep working for one release and emit a one-line deprecation notice mapping them to their new verbs.
 
-Supported URL schemes for `gitpulse add`: `https://`, `http://`, `git@host:user/repo`, `ssh://`, `git://`. Remote adds use the hardened safe-clone path (hooks disabled via `GIT_CONFIG_*`; `--no-checkout` followed by explicit checkout) to mitigate CVE-2024-32002 / 32004 / 32465.
+Supported URL schemes for `nostos add`: `https://`, `http://`, `git@host:user/repo`, `ssh://`, `git://`. Remote adds use the hardened safe-clone path (hooks disabled via `GIT_CONFIG_*`; `--no-checkout` followed by explicit checkout) to mitigate CVE-2024-32002 / 32004 / 32465.
 
 ---
 
 ## Upstream probes
 
-`gitpulse refresh` populates a cached snapshot of each repo's **upstream** health into the index: stars, forks, open issues, archived status, default branch, license, last push, latest release. The snapshot lives next to the repo row in the `upstream_meta` table and has a configurable TTL (default 7 days).
+`nostos refresh` populates a cached snapshot of each repo's **upstream** health into the index: stars, forks, open issues, archived status, default branch, license, last push, latest release. The snapshot lives next to the repo row in the `upstream_meta` table and has a configurable TTL (default 7 days).
 
-Everything here is **opt-in and fail-closed by default**. A fresh install with no `auth.toml` issues zero outbound calls; `refresh` simply reports that every repo was skipped because its host is not authorised. That is the correct behaviour - gitpulse will never enumerate your full toolchain to a third party it has not been explicitly told about.
+Everything here is **opt-in and fail-closed by default**. A fresh install with no `auth.toml` issues zero outbound calls; `refresh` simply reports that every repo was skipped because its host is not authorised. That is the correct behaviour - nostos will never enumerate your full toolchain to a third party it has not been explicitly told about.
 
 ### Supported providers
 
@@ -477,11 +477,11 @@ Everything here is **opt-in and fail-closed by default**. A fresh install with n
 | GitLab | `gitlab.com` | any host | `/api/v4` |
 | Gitea | - | any host | `/api/v1` |
 
-For `github.com` and `gitlab.com` the provider is inferred. For every other host you must set `provider = "github"` / `"gitlab"` / `"gitea"` explicitly in `auth.toml`; gitpulse never guesses.
+For `github.com` and `gitlab.com` the provider is inferred. For every other host you must set `provider = "github"` / `"gitlab"` / `"gitea"` explicitly in `auth.toml`; nostos never guesses.
 
-### Auth config: `~/.config/gitpulse/auth.toml`
+### Auth config: `~/.config/nostos/auth.toml`
 
-Created automatically under `0700` inside `$XDG_CONFIG_HOME/gitpulse/`. The file itself **must** be `0600` and owned by the invoking user; otherwise gitpulse refuses to read it.
+Created automatically under `0700` inside `$XDG_CONFIG_HOME/nostos/`. The file itself **must** be `0600` and owned by the invoking user; otherwise nostos refuses to read it.
 
 ```toml
 [hosts."github.com"]
@@ -511,29 +511,29 @@ allow_unknown = false               # keep fail-closed; true lets unconfigured
 
 ```bash
 # Default: refresh stale (>7d) cache entries for configured hosts only
-gitpulse refresh
+nostos refresh
 
 # Refresh every registered repo regardless of cache age
-gitpulse refresh --all
+nostos refresh --all
 
 # Refresh one repo
-gitpulse refresh --repo ~/tools/recon-kit
+nostos refresh --repo ~/tools/recon-kit
 
 # Change the TTL window
-gitpulse refresh --since 30
+nostos refresh --since 30
 
 # Hard kill switch - zero network traffic, prints what would be refreshed
-gitpulse refresh --offline
+nostos refresh --offline
 
 # JSON summary for scripting
-gitpulse refresh --json
+nostos refresh --json
 ```
 
 ### Probe flow
 
 ```mermaid
 flowchart TD
-    start([gitpulse refresh]) --> auth[Load auth.toml<br/>enforce 0600 perms]
+    start([nostos refresh]) --> auth[Load auth.toml<br/>enforce 0600 perms]
     auth --> pick{Target set}
     pick -->|--repo R| one[Single repo]
     pick -->|--all| everyone[All repos]
@@ -564,17 +564,17 @@ flowchart TD
 
 ```bash
 # What did upstream archive recently?
-gitpulse refresh --all --json | jq -r '.errors[] | .path'   # errors first
-gitpulse list --upstream-archived
+nostos refresh --all --json | jq -r '.errors[] | .path'   # errors first
+nostos list --upstream-archived
 
 # Which of my tools upstream has been dormant for more than a year?
-gitpulse list --upstream-dormant 365
+nostos list --upstream-dormant 365
 
 # What's in my index but has never been probed?
-gitpulse list --upstream-stale 0
+nostos list --upstream-stale 0
 
 # Check one tool's full state (local + upstream) at a glance
-gitpulse show org/name
+nostos show org/name
 ```
 
 ### Opsec invariants
@@ -592,13 +592,13 @@ Stated precisely because these are load-bearing for red-team use:
 
 ## Weekly digest
 
-`gitpulse digest` produces a read-only, zero-network changeset report over the metadata index. Run it on Monday mornings to see what moved in your fleet, what needs attention, and what supply-chain flags are still outstanding.
+`nostos digest` produces a read-only, zero-network changeset report over the metadata index. Run it on Monday mornings to see what moved in your fleet, what needs attention, and what supply-chain flags are still outstanding.
 
 ```bash
-gitpulse digest                     # 7-day window, 90d stale, 365d dormant
-gitpulse digest --since 14          # widen the window
-gitpulse digest --json | jq .       # machine-readable for dashboards
-gitpulse digest --json | jq '.counts'
+nostos digest                     # 7-day window, 90d stale, 365d dormant
+nostos digest --since 14          # widen the window
+nostos digest --json | jq .       # machine-readable for dashboards
+nostos digest --json | jq '.counts'
 ```
 
 The report always includes these sections (fixed-shape JSON with `schema: 1`):
@@ -619,11 +619,11 @@ Pipe the JSON output into a Slack webhook, Grafana Loki, a ticketing system, or 
 
 ## Obsidian vault export
 
-`gitpulse vault export` writes one markdown file per repo into an Obsidian vault, with YAML frontmatter that Obsidian renders as native Properties (tags become clickable, upstream fields become dataview-queryable). This turns your fleet into a browsable, searchable knowledge base without running a separate database.
+`nostos vault export` writes one markdown file per repo into an Obsidian vault, with YAML frontmatter that Obsidian renders as native Properties (tags become clickable, upstream fields become dataview-queryable). This turns your fleet into a browsable, searchable knowledge base without running a separate database.
 
 ### Configure the vault path
 
-Add the vault to `~/.gitpulserc`:
+Add the vault to `~/.nostosrc`:
 
 ```ini
 [vault]
@@ -631,7 +631,7 @@ path   = /home/user/obsidian/red-team
 subdir = repos
 ```
 
-Or override per-run: `gitpulse vault export --path ~/obsidian/red-team --subdir tools`.
+Or override per-run: `nostos vault export --path ~/obsidian/red-team --subdir tools`.
 
 ### What gets written
 
@@ -639,7 +639,7 @@ Each repo produces `<vault>/<subdir>/<slug>.md` where `slug` is `<owner>-<name>`
 
 ```yaml
 ---
-gitpulse_id: 42
+nostos_id: 42
 path: "/home/user/tools/recon-kit"
 remote_url: "git@github.com:org/recon-kit.git"
 source: "blog:orange.tw, 2026-04-12"
@@ -664,7 +664,7 @@ upstream:
 
 # org/recon-kit
 
-*Exported by gitpulse 2.3.0 on 2026-04-15T14:10:00+00:00*
+*Exported by nostos 2.3.0 on 2026-04-15T14:10:00+00:00*
 
 ## Description
 
@@ -678,32 +678,32 @@ upstream:
 
 ### Narrow two-way sync (as of 2.5.0)
 
-The vault is reconciliable with the DB, but **on a deliberately narrow surface**. `gitpulse vault sync` reads operator edits to `status` and `tags` out of each file's frontmatter, applies them to the DB, and then regenerates every `.md` from the reconciled state.
+The vault is reconciliable with the DB, but **on a deliberately narrow surface**. `nostos vault sync` reads operator edits to `status` and `tags` out of each file's frontmatter, applies them to the DB, and then regenerates every `.md` from the reconciled state.
 
 | Field | Writer | Sync behaviour |
 | --- | --- | --- |
 | `status` | operator (Obsidian Properties) | vault wins, DB is updated on next `vault sync` |
 | `tags` | operator (Obsidian Properties) | vault wins, DB tag set is replaced to match |
-| `upstream.*` | `gitpulse refresh` | DB wins, vault values are regenerated on sync |
-| `last_touched`, `remote_url`, `path`, `added`, `gitpulse_id` | gitpulse | DB wins, regenerated on sync |
-| Note body (Markdown) | gitpulse (via `gitpulse note`) | DB wins, body is regenerated on sync; vault edits to the Notes section are ignored |
+| `upstream.*` | `nostos refresh` | DB wins, vault values are regenerated on sync |
+| `last_touched`, `remote_url`, `path`, `added`, `nostos_id` | nostos | DB wins, regenerated on sync |
+| Note body (Markdown) | nostos (via `nostos note`) | DB wins, body is regenerated on sync; vault edits to the Notes section are ignored |
 
-The two sides never write to the same field, so there is no merge-conflict surface and no precedence timestamp needed. Orphan vault files (whose `gitpulse_id` no longer matches a repo in the DB) are reported, not deleted; the operator decides.
+The two sides never write to the same field, so there is no merge-conflict surface and no precedence timestamp needed. Orphan vault files (whose `nostos_id` no longer matches a repo in the DB) are reported, not deleted; the operator decides.
 
 ```bash
 # Edit tags / status in Obsidian, then pull them into the DB
-gitpulse vault sync
+nostos vault sync
 
 # JSON summary for scripting / cron
-gitpulse vault sync --json
+nostos vault sync --json
 
 # Override the vault path per invocation
-gitpulse vault sync --path ~/other-vault
+nostos vault sync --path ~/other-vault
 ```
 
-`gitpulse vault export` is still supported and useful as a one-shot "rebuild from DB" operation (for example right after a large `gitpulse refresh`); `vault sync` is the right daily verb because it also catches any tag/status curation you did in Obsidian.
+`nostos vault export` is still supported and useful as a one-shot "rebuild from DB" operation (for example right after a large `nostos refresh`); `vault sync` is the right daily verb because it also catches any tag/status curation you did in Obsidian.
 
-Note: the vault contains the same sensitive operator context as the index (tags, sources, notes, upstream metadata). Treat the vault directory with the same opsec posture as `$XDG_DATA_HOME/gitpulse/`: files are written `0600` and the `repos` subdirectory is created `0700` on Unix; keep the vault on an encrypted volume at rest.
+Note: the vault contains the same sensitive operator context as the index (tags, sources, notes, upstream metadata). Treat the vault directory with the same opsec posture as `$XDG_DATA_HOME/nostos/`: files are written `0600` and the `repos` subdirectory is created `0700` on Unix; keep the vault on an encrypted volume at rest.
 
 ### Dataview queries once you have exported
 
@@ -724,40 +724,40 @@ WHERE upstream.archived = true
 
 ## Portable export and import
 
-`gitpulse export` writes a schema-versioned JSON bundle of the metadata index; `gitpulse import` re-applies one. Use this for backup, cross-machine migration, team onboarding, or sharing a redacted tool inventory with a collaborator.
+`nostos export` writes a schema-versioned JSON bundle of the metadata index; `nostos import` re-applies one. Use this for backup, cross-machine migration, team onboarding, or sharing a redacted tool inventory with a collaborator.
 
 ### Export
 
 ```bash
 # Stdout (default) - pipes cleanly into ssh / scp / archivers
-gitpulse export > gitpulse-$(date +%Y%m%d).json
+nostos export > nostos-$(date +%Y%m%d).json
 
 # To a file (chmod 0600 on Unix)
-gitpulse export --out /backup/gitpulse.json
+nostos export --out /backup/nostos.json
 
 # Redact notes, source, and remote_url - safe to share
-gitpulse export --out share.json --redact --pretty
+nostos export --out share.json --redact --pretty
 ```
 
-The bundle carries: `schema` (currently 1), `exported_at`, `gitpulse_version`, `redacted` flag, and a `repos[]` array. Each repo entry includes path, remote_url (null if redacted), source (null if redacted), status, quiet flag, timestamps, tags, notes (empty if redacted), and the latest `upstream` metadata snapshot.
+The bundle carries: `schema` (currently 1), `exported_at`, `nostos_version`, `redacted` flag, and a `repos[]` array. Each repo entry includes path, remote_url (null if redacted), source (null if redacted), status, quiet flag, timestamps, tags, notes (empty if redacted), and the latest `upstream` metadata snapshot.
 
 ### Import
 
 ```bash
 # Default: additive merge into the current index
-gitpulse import bundle.json
+nostos import bundle.json
 
 # From stdin - end-to-end pipe between machines
-gitpulse export | ssh ops-box "gitpulse import -"
+nostos export | ssh ops-box "nostos import -"
 
 # Cross-machine path rewrite (Alice's paths -> Bob's paths)
-gitpulse import bundle.json --remap /home/alice:/home/bob
+nostos import bundle.json --remap /home/alice:/home/bob
 
 # Wipe-and-replace mode (privileged; requires --yes for non-interactive use)
-gitpulse import bundle.json --replace --yes
+nostos import bundle.json --replace --yes
 
 # Preview without writing
-gitpulse import bundle.json --dry-run --json
+nostos import bundle.json --dry-run --json
 ```
 
 **Merge semantics (default):**
@@ -765,7 +765,7 @@ gitpulse import bundle.json --dry-run --json
 - Repos that already exist locally keep their **status, source, and quiet flag** unchanged. Local operator decisions always win.
 - Tags are **unioned** (duplicates dropped).
 - Notes are **appended** (we cannot tell which are "new" without content hashing; append is the right default).
-- `upstream` metadata from the bundle is written as the current cached value. Run `gitpulse refresh` afterwards to rebuild it from live providers.
+- `upstream` metadata from the bundle is written as the current cached value. Run `nostos refresh` afterwards to rebuild it from live providers.
 
 **Replace semantics (`--replace`):**
 - Local index is **wiped** first, then the bundle is applied fresh.
@@ -778,7 +778,7 @@ gitpulse import bundle.json --dry-run --json
 {
   "schema": 1,
   "exported_at": "2026-04-15T15:30:00+00:00",
-  "gitpulse_version": "2.4.0",
+  "nostos_version": "2.4.0",
   "redacted": false,
   "repos": [
     {
@@ -809,19 +809,19 @@ gitpulse import bundle.json --dry-run --json
 
 ## Self-update
 
-`gitpulse update` compares the running version against the latest GitHub release and - if requested - applies the upgrade for your install method.
+`nostos update` compares the running version against the latest GitHub release and - if requested - applies the upgrade for your install method.
 
-This is the only command that reaches out to `github.com` in default configuration. It is an opt-in network call triggered by the user's explicit command; `--offline` hard-disables it. The release check issues **one** HTTPS GET to `api.github.com/repos/prodrom3/gitpulse/releases/latest`; no telemetry, no aggregate reporting.
+This is the only command that reaches out to `github.com` in default configuration. It is an opt-in network call triggered by the user's explicit command; `--offline` hard-disables it. The release check issues **one** HTTPS GET to `api.github.com/repos/prodrom3/nostos/releases/latest`; no telemetry, no aggregate reporting.
 
 ### Install-method detection
 
 ```mermaid
 flowchart TD
-    start([gitpulse update]) --> detect[Detect install method]
-    detect --> src{.git at install root?<br/>remote points at gitpulse?}
+    start([nostos update]) --> detect[Detect install method]
+    detect --> src{.git at install root?<br/>remote points at nostos?}
     src -->|yes| source[source clone<br/>upgrade: git -C ROOT pull --ff-only]
-    src -->|no| pipx{pipx list --json has gitpulse?}
-    pipx -->|yes| pipxm[pipx install<br/>upgrade: pipx upgrade gitpulse]
+    src -->|no| pipx{pipx list --json has nostos?}
+    pipx -->|yes| pipxm[pipx install<br/>upgrade: pipx upgrade nostos]
     pipx -->|no| pip[pip install<br/>upgrade command printed, never auto-run]
 ```
 
@@ -829,24 +829,24 @@ flowchart TD
 
 ```bash
 # Report-only: is there a newer release?
-gitpulse update --check
+nostos update --check
 
 # Apply the upgrade for the auto-detected method (prompts to confirm)
-gitpulse update
+nostos update
 
 # Non-interactive apply (for cron / CI - use with care)
-gitpulse update --yes
+nostos update --yes
 
 # Offline mode: print local state only, no network
-gitpulse update --offline
+nostos update --offline
 ```
 
 ### Behaviour per install method
 
-| Install | `gitpulse update` does | Notes |
+| Install | `nostos update` does | Notes |
 | --- | --- | --- |
 | Source clone | `git -C <root> pull --ff-only` | Fast-forward only; any local commits block the upgrade explicitly. |
-| pipx | `pipx upgrade gitpulse` | Standard pipx venv upgrade. |
+| pipx | `pipx upgrade nostos` | Standard pipx venv upgrade. |
 | pip | Prints the recommended `pip install --upgrade ...` command | Never invoked automatically; the right invocation depends on `--user`, venv, or system-wide state, and often needs sudo. |
 
 ### Opsec properties
@@ -935,14 +935,14 @@ Skipped repositories (dirty, detached, no upstream) do **not** fail the run - th
 ```yaml
 - name: Refresh vendored clones
   run: |
-    python gitpulse.py ./vendor --quiet --json > /tmp/gitpulse.json
-    jq '.counts' /tmp/gitpulse.json
+    python nostos.py ./vendor --quiet --json > /tmp/nostos.json
+    jq '.counts' /tmp/nostos.json
 ```
 
 ### Cron example
 
 ```cron
-*/30 * * * *  /usr/local/bin/gitpulse ~/projects --quiet --fetch-only
+*/30 * * * *  /usr/local/bin/nostos ~/projects --quiet --fetch-only
 ```
 
 Combine with JSON output to feed dashboards (Prometheus text exporter, Grafana Loki, ELK, etc.).
@@ -951,38 +951,38 @@ Combine with JSON output to feed dashboards (Prometheus text exporter, Grafana L
 
 ## Logging
 
-Each run writes a timestamped log file to `./logs/` (relative to the gitpulse install root), e.g. `2026-04-02_14-30-00.log`. Log files are automatically rotated - only the most recent 20 are kept (configurable via `max_log_files` in `~/.gitpulserc`). Files are created with owner-only (0600) permissions, and HTTPS credentials of the form `https://user:token@host/` are sanitized to `https://***@host/` before being written.
+Each run writes a timestamped log file to `./logs/` (relative to the nostos install root), e.g. `2026-04-02_14-30-00.log`. Log files are automatically rotated - only the most recent 20 are kept (configurable via `max_log_files` in `~/.nostosrc`). Files are created with owner-only (0600) permissions, and HTTPS credentials of the form `https://user:token@host/` are sanitized to `https://***@host/` before being written.
 
 ---
 
 ## Security
 
-gitpulse treats git operations on untrusted working directories as an attack surface, and treats the metadata index as an intelligence artifact. Defense-in-depth applies at both layers:
+nostos treats git operations on untrusted working directories as an attack surface, and treats the metadata index as an intelligence artifact. Defense-in-depth applies at both layers:
 
 | Control | Description |
 | --- | --- |
 | **Git version check** | Startup warning on git < 2.45.1 (CVE-2024-32002, CVE-2024-32004, CVE-2024-32465). |
-| **Safe remote clone** | `gitpulse add <url>` clones with `--no-checkout` and disables hooks via `GIT_CONFIG_*` env vars, then checks out in a second step. |
+| **Safe remote clone** | `nostos add <url>` clones with `--no-checkout` and disables hooks via `GIT_CONFIG_*` env vars, then checks out in a second step. |
 | **Credential redaction** | HTTPS credentials stripped from all log and summary output, and from `remote_url` values written to the index. |
 | **Strict file permissions** | Log files and the metadata index DB chmod-ed to `0600`; data and config directories to `0700` (Unix). |
-| **Ownership checks** | `~/.gitpulserc` and legacy `~/.gitpulse_repos` rejected if not owned by the invoking user or world-writable (Unix). |
+| **Ownership checks** | `~/.nostosrc` and legacy `~/.nostos_repos` rejected if not owned by the invoking user or world-writable (Unix). |
 | **Repository ownership** | Repos not owned by the current user are skipped on Unix. |
 | **Symlink protection** | The `logs/` directory is rejected if it is a symlink. |
 | **No shell injection** | Every subprocess call uses list arguments; `shell=True` is never used. |
 | **Index hardening** | SQLite PRAGMAs `journal_mode=WAL`, `secure_delete=ON`, `foreign_keys=ON` applied on every connection. Deleted rows are overwritten on disk. |
-| **Probe fail-closed** | Upstream probes only contact hosts listed in `~/.config/gitpulse/auth.toml`; unknown hosts are silently skipped unless `defaults.allow_unknown = true`. |
-| **Per-repo quiet flag** | `gitpulse add --quiet-upstream` marks a repo as ineligible for upstream probes. The probe layer never queries or logs these repos. |
+| **Probe fail-closed** | Upstream probes only contact hosts listed in `~/.config/nostos/auth.toml`; unknown hosts are silently skipped unless `defaults.allow_unknown = true`. |
+| **Per-repo quiet flag** | `nostos add --quiet-upstream` marks a repo as ineligible for upstream probes. The probe layer never queries or logs these repos. |
 | **Offline kill switch** | `refresh --offline` hard-disables the network layer; no exception paths, no fail-open. |
 | **Token hygiene** | Tokens are sourced from environment variables by default (`token_env`), passed as `Authorization: Bearer`, and redacted from every log and error path. |
 | **Auth file perms** | `auth.toml` is rejected on load if its mode is not `0600` or the owner is not the invoking user (Unix). |
 
 ### At-rest confidentiality
 
-The index reveals the operator's full toolchain. gitpulse deliberately ships **no** built-in DB encryption (adding a runtime dep would expand the supply-chain surface). Instead: place `$XDG_DATA_HOME/gitpulse/` on a disk-layer encrypted volume (LUKS on Linux, FileVault on macOS, BitLocker on Windows). That is the right layer for this threat model.
+The index reveals the operator's full toolchain. nostos deliberately ships **no** built-in DB encryption (adding a runtime dep would expand the supply-chain surface). Instead: place `$XDG_DATA_HOME/nostos/` on a disk-layer encrypted volume (LUKS on Linux, FileVault on macOS, BitLocker on Windows). That is the right layer for this threat model.
 
 ### Reporting Vulnerabilities
 
-Please report security issues privately by opening a [GitHub security advisory](https://github.com/prodrom3/gitpulse/security/advisories/new) rather than filing a public issue. Public issue reports are acceptable only for **already-disclosed** CVEs or clearly non-sensitive hardening suggestions.
+Please report security issues privately by opening a [GitHub security advisory](https://github.com/prodrom3/nostos/security/advisories/new) rather than filing a public issue. Public issue reports are acceptable only for **already-disclosed** CVEs or clearly non-sensitive hardening suggestions.
 
 ---
 
@@ -994,7 +994,7 @@ Please report security issues privately by opening a [GitHub security advisory](
 | macOS (latest)  | ✓ | ✓ | ✓ | ✓ |
 | Windows (latest) | ✓ | ✓ | ✓ | ✓ |
 
-CI exercises every cell of this matrix on every push and pull request. See the [CI workflow](.github/workflows/ci.yml) and the ["CI" badge](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml) at the top of this file for current build status.
+CI exercises every cell of this matrix on every push and pull request. See the [CI workflow](.github/workflows/ci.yml) and the ["CI" badge](https://github.com/prodrom3/nostos/actions/workflows/ci.yml) at the top of this file for current build status.
 
 ---
 
@@ -1003,12 +1003,12 @@ CI exercises every cell of this matrix on every push and pull request. See the [
 ### Module layout
 
 ```
-gitpulse.py                 # thin entrypoint -> core.cli.run
+nostos.py                 # thin entrypoint -> core.cli.run
 core/
 ├── cli.py                  # argparse subparsers, legacy flag shim, default-verb injection
 ├── paths.py                # XDG-compliant paths ($XDG_CONFIG_HOME / $XDG_DATA_HOME)
 ├── index.py                # SQLite metadata index: schema, migrations, CRUD, PRAGMAs
-├── config.py               # ~/.gitpulserc loader + safety checks
+├── config.py               # ~/.nostosrc loader + safety checks
 ├── discovery.py            # depth-limited directory walk, exclude globs, ownership check
 ├── logging_config.py       # logs/ setup, rotation, symlink protection
 ├── models.py               # RepoResult, RepoStatus dataclasses
@@ -1031,7 +1031,7 @@ core/
 
 ```mermaid
 flowchart LR
-    entry[gitpulse.py<br/>entrypoint]
+    entry[nostos.py<br/>entrypoint]
     cli[core.cli<br/>subparsers + shim]
     paths[core.paths<br/>XDG]
     idx[core.index<br/>SQLite]
@@ -1058,14 +1058,14 @@ flowchart LR
     watchlist -. invokes hardened clone for `add` .-> updater
 ```
 
-### Run flow: `gitpulse pull`
+### Run flow: `nostos pull`
 
 ```mermaid
 flowchart TD
-    start([gitpulse invoked]) --> rewrite[Rewrite legacy flags<br/>inject default verb]
+    start([nostos invoked]) --> rewrite[Rewrite legacy flags<br/>inject default verb]
     rewrite --> disp[Dispatch to<br/>core.commands.pull.run]
     disp --> mig[First-run watchlist<br/>migration into index]
-    mig --> rc[Load ~/.gitpulserc]
+    mig --> rc[Load ~/.nostosrc]
     rc --> src{Source of repos}
     src -->|--from-index| idx[Read metadata index]
     src -->|directory| scan[Walk directory tree]
@@ -1088,16 +1088,16 @@ flowchart TD
     summary --> done([Exit 0 / 1])
 ```
 
-### Intake flow: `gitpulse add` -> `triage`
+### Intake flow: `nostos add` -> `triage`
 
 ```mermaid
 flowchart LR
     url[URL or path<br/>from intel feed]
-    add[gitpulse add<br/>hardened clone]
+    add[nostos add<br/>hardened clone]
     index[(metadata index)]
-    triage[gitpulse triage<br/>interactive loop]
-    list[gitpulse list<br/>filters]
-    show[gitpulse show<br/>per-repo view]
+    triage[nostos triage<br/>interactive loop]
+    list[nostos list<br/>filters]
+    show[nostos show<br/>per-repo view]
 
     url --> add
     add -->|status=new| index
@@ -1111,13 +1111,13 @@ flowchart LR
 
 ## Versioning & Support
 
-gitpulse follows [Semantic Versioning](https://semver.org/) 2.0. Breaking changes are introduced only in a new **major** version and are called out in the release notes.
+nostos follows [Semantic Versioning](https://semver.org/) 2.0. Breaking changes are introduced only in a new **major** version and are called out in the release notes.
 
 - **Stable:** CLI flags and exit codes.
 - **Stable:** JSON output schema.
 - **Internal:** the `core/` Python API is not a supported public API - import at your own risk.
 
-Current version: see [`VERSION`](./VERSION) and `gitpulse --version`.
+Current version: see [`VERSION`](./VERSION) and `nostos --version`.
 
 ---
 
@@ -1128,8 +1128,8 @@ Contributions are welcome. Before opening a pull request:
 1. Run the local gate:
    ```bash
    python -m unittest discover -s tests -v
-   python -m mypy core/ gitpulse.py
-   python -m ruff check core/ gitpulse.py tests/
+   python -m mypy core/ nostos.py
+   python -m ruff check core/ nostos.py tests/
    ```
 2. Add or update tests for behavior changes.
 3. Keep the change focused - one logical unit per PR.

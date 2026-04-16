@@ -1,4 +1,4 @@
-"""`gitpulse triage` - walk the inbox of newly-added repos.
+"""`nostos triage` - walk the inbox of newly-added repos.
 
 Iterates over repos with status='new', prompting the operator for
 tags, a status transition, and an optional note. Keyboard-driven,
@@ -57,7 +57,7 @@ def run(args: argparse.Namespace) -> int:
         with _index.connect() as conn:
             queue = _index.list_repos(conn, status=args.status)
     except OSError as e:
-        print(f"gitpulse: error: {e}", file=sys.stderr)
+        print(f"nostos: error: {e}", file=sys.stderr)
         return 1
 
     if not queue:

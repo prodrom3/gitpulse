@@ -1,4 +1,4 @@
-"""`gitpulse add` - ingest a repo into the metadata index.
+"""`nostos add` - ingest a repo into the metadata index.
 
 Accepts either a local path to an existing git repository or a remote
 URL. When given a URL, the repo is cloned first (via the hardened

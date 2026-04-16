@@ -166,7 +166,7 @@ class TestSafeCloneEnv(unittest.TestCase):
 class TestAddToWatchlistWithUrl(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.mkdtemp()
-        self.wl_path = os.path.join(self.tmpdir, ".gitpulse_repos")
+        self.wl_path = os.path.join(self.tmpdir, ".nostos_repos")
         self.clone_dir = os.path.join(self.tmpdir, "clones")
 
     def tearDown(self) -> None:
@@ -199,7 +199,7 @@ class TestAddToWatchlistWithUrl(unittest.TestCase):
 
 class TestWatchlistSafety(unittest.TestCase):
     def _write_file(self, content: str) -> str:
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".gitpulse_repos", delete=False)
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".nostos_repos", delete=False)
         f.write(content)
         f.close()
         self.addCleanup(os.unlink, f.name)
@@ -239,7 +239,7 @@ class TestLoadWatchlist(unittest.TestCase):
         return repo_dir
 
     def _write_watchlist(self, content: str) -> str:
-        path = os.path.join(self.tmpdir, ".gitpulse_repos")
+        path = os.path.join(self.tmpdir, ".nostos_repos")
         with open(path, "w") as f:
             f.write(content)
         return path
@@ -289,7 +289,7 @@ class TestLoadWatchlist(unittest.TestCase):
 class TestAddToWatchlist(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.mkdtemp()
-        self.wl_path = os.path.join(self.tmpdir, ".gitpulse_repos")
+        self.wl_path = os.path.join(self.tmpdir, ".nostos_repos")
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmpdir, ignore_errors=True)
@@ -340,7 +340,7 @@ class TestAddToWatchlist(unittest.TestCase):
 class TestRemoveFromWatchlist(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.mkdtemp()
-        self.wl_path = os.path.join(self.tmpdir, ".gitpulse_repos")
+        self.wl_path = os.path.join(self.tmpdir, ".nostos_repos")
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmpdir, ignore_errors=True)

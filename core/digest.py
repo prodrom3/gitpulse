@@ -134,7 +134,7 @@ def render_human(digest: dict[str, Any]) -> str:
             out.append("  " + fmt(r))
 
     out.append(
-        f"gitpulse digest ({digest['generated_at']}) - "
+        f"nostos digest ({digest['generated_at']}) - "
         f"window {digest['window_days']}d"
     )
     counts = digest["counts"]

@@ -1,6 +1,6 @@
-"""Auth config for gitpulse upstream probes.
+"""Auth config for nostos upstream probes.
 
-Reads $XDG_CONFIG_HOME/gitpulse/auth.toml and exposes a per-host view:
+Reads $XDG_CONFIG_HOME/nostos/auth.toml and exposes a per-host view:
 
     [hosts."github.com"]
     token_env = "GITHUB_TOKEN"       # preferred
@@ -37,7 +37,7 @@ from .paths import auth_config_path
 # Python 3.11+ ships tomllib in the stdlib. On 3.10 we fall back to
 # tomli if it happens to be installed; otherwise the TOML loader is
 # disabled entirely and load_auth() returns a fail-closed config with
-# a clear warning. This keeps gitpulse importable with zero runtime
+# a clear warning. This keeps nostos importable with zero runtime
 # dependencies on every supported Python, and keeps the opsec posture
 # correct: no TOML parser means no auth.toml is read, which means
 # every upstream probe is skipped fail-closed.

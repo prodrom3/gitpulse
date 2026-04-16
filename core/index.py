@@ -1,6 +1,6 @@
-"""Metadata index for the gitpulse repo fleet.
+"""Metadata index for the nostos repo fleet.
 
-A single SQLite file at $XDG_DATA_HOME/gitpulse/index.db stores per-repo
+A single SQLite file at $XDG_DATA_HOME/nostos/index.db stores per-repo
 identity, triage state, tags, and free-text notes. The file is created
 0600 and opened with hardened PRAGMAs (WAL, secure_delete, foreign_keys).
 
@@ -132,8 +132,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         return
     if version > CURRENT_SCHEMA_VERSION:
         raise RuntimeError(
-            f"index.db schema version {version} is newer than this gitpulse "
-            f"release supports ({CURRENT_SCHEMA_VERSION}). Upgrade gitpulse."
+            f"index.db schema version {version} is newer than this nostos "
+            f"release supports ({CURRENT_SCHEMA_VERSION}). Upgrade nostos."
         )
     if version == 0:
         conn.executescript(_SCHEMA_V1)
@@ -619,7 +619,7 @@ def list_stale_upstream(
 
 
 def migrate_watchlist(conn: sqlite3.Connection, watchlist_path: str) -> int:
-    """Import entries from ~/.gitpulse_repos into the index.
+    """Import entries from ~/.nostos_repos into the index.
 
     Returns the number of rows inserted. Existing entries are left alone.
     Caller is responsible for renaming the source file after this runs.

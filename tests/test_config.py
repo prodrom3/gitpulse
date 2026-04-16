@@ -17,7 +17,7 @@ from core.config import (
 
 class TestLoadConfigDefaults(unittest.TestCase):
     def test_defaults_when_no_file(self):
-        with mock.patch("core.config.get_config_path", return_value="/nonexistent/.gitpulserc"):
+        with mock.patch("core.config.get_config_path", return_value="/nonexistent/.nostosrc"):
             config = load_config()
 
         self.assertEqual(config["depth"], DEFAULT_DEPTH)
@@ -30,7 +30,7 @@ class TestLoadConfigDefaults(unittest.TestCase):
 
 class TestLoadConfigFromFile(unittest.TestCase):
     def _write_config(self, content):
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".gitpulserc", delete=False)
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".nostosrc", delete=False)
         f.write(content)
         f.close()
         self.addCleanup(os.unlink, f.name)
@@ -92,7 +92,7 @@ class TestLoadConfigFromFile(unittest.TestCase):
 
 class TestConfigSafety(unittest.TestCase):
     def _write_config(self, content):
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".gitpulserc", delete=False)
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".nostosrc", delete=False)
         f.write(content)
         f.close()
         self.addCleanup(os.unlink, f.name)

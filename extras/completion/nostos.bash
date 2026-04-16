@@ -1,9 +1,9 @@
-# Bash completion for gitpulse
-# Source this file or copy to /etc/bash_completion.d/gitpulse
+# Bash completion for nostos
+# Source this file or copy to /etc/bash_completion.d/nostos
 #
-#   source extras/completion/gitpulse.bash
+#   source extras/completion/nostos.bash
 
-_gitpulse() {
+_nostos() {
     local cur prev words cword
     _init_completion || return
 
@@ -86,5 +86,5 @@ _gitpulse() {
     fi
 }
 
-complete -F _gitpulse -o default gitpulse
-complete -F _gitpulse -o default gitpulse.py
+complete -F _nostos -o default nostos
+complete -F _nostos -o default nostos.py

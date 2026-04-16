@@ -1,4 +1,4 @@
-"""`gitpulse tag` - add / remove tags on a repository.
+"""`nostos tag` - add / remove tags on a repository.
 
 Tags prefixed with `+` are added; tags prefixed with `-` are removed.
 A bare tag (no prefix) is treated as an add.

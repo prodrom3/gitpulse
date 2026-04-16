@@ -1,7 +1,7 @@
-"""`gitpulse refresh` - populate upstream metadata for registered repos.
+"""`nostos refresh` - populate upstream metadata for registered repos.
 
 Default behaviour is conservative:
-- Only queries hosts listed in ~/.config/gitpulse/auth.toml (fail-closed).
+- Only queries hosts listed in ~/.config/nostos/auth.toml (fail-closed).
 - Skips repos with quiet=1 absolutely (no network, no log of repo path).
 - Refreshes only stale cache entries (older than --since TTL).
 
@@ -113,7 +113,7 @@ def run(args: argparse.Namespace) -> int:
         return fail(str(e))
 
     if not targets:
-        print("gitpulse refresh: nothing to refresh", file=sys.stderr)
+        print("nostos refresh: nothing to refresh", file=sys.stderr)
         return 0
 
     refreshed = 0
@@ -128,7 +128,7 @@ def run(args: argparse.Namespace) -> int:
         # at info level; debug only.
         if repo.get("quiet"):
             skipped_quiet += 1
-            logging.debug("gitpulse refresh: skipping quiet repo")
+            logging.debug("nostos refresh: skipping quiet repo")
             continue
 
         remote_url = repo.get("remote_url")
@@ -146,11 +146,11 @@ def run(args: argparse.Namespace) -> int:
 
         if not auth.is_allowed(host):
             skipped_unauthorised += 1
-            logging.debug(f"gitpulse refresh: host {host} not in auth.toml, skipping")
+            logging.debug(f"nostos refresh: host {host} not in auth.toml, skipping")
             continue
 
         if args.offline:
-            logging.info(f"gitpulse refresh: (offline) would refresh {path} from {host}")
+            logging.info(f"nostos refresh: (offline) would refresh {path} from {host}")
             continue
 
         try:

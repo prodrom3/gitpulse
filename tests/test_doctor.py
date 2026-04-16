@@ -1,4 +1,4 @@
-"""Tests for gitpulse doctor."""
+"""Tests for nostos doctor."""
 
 import argparse
 import io
@@ -84,7 +84,7 @@ class TestDoctorChecks(_IndexTestCase):
         os.makedirs(repos_dir)
         # Write a vault file with an id that doesn't exist in the DB
         with open(os.path.join(repos_dir, "orphan.md"), "w") as f:
-            f.write("---\ngitpulse_id: 9999\nstatus: \"new\"\n---\n")
+            f.write("---\nnostos_id: 9999\nstatus: \"new\"\n---\n")
         with index.connect(self.db) as conn:
             report = _doctor.run_checks(
                 conn, vault_path=vault_dir, vault_subdir="repos"
@@ -112,7 +112,7 @@ class TestDoctorFix(_IndexTestCase):
         os.makedirs(repos_dir)
         orphan = os.path.join(repos_dir, "orphan.md")
         with open(orphan, "w") as f:
-            f.write("---\ngitpulse_id: 9999\nstatus: \"new\"\n---\n")
+            f.write("---\nnostos_id: 9999\nstatus: \"new\"\n---\n")
         with index.connect(self.db) as conn:
             report = _doctor.run_checks(
                 conn, vault_path=vault_dir, vault_subdir="repos"

@@ -242,7 +242,7 @@ class TestShowUpstreamBlock(_IndexTestCase):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
             cmd_show.run(args)
         text = out.getvalue()
-        self.assertIn("run `gitpulse refresh`", text)
+        self.assertIn("run `nostos refresh`", text)
 
     def test_show_json_includes_upstream(self):
         with index.connect(self.db) as conn:

@@ -5,7 +5,7 @@ import stat
 import subprocess
 import sys
 
-WATCHLIST_FILENAME: str = ".gitpulse_repos"
+WATCHLIST_FILENAME: str = ".nostos_repos"
 
 _URL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^https?://"),

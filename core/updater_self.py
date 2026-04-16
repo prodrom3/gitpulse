@@ -1,8 +1,8 @@
-"""Self-update helpers for `gitpulse update`.
+"""Self-update helpers for `nostos update`.
 
 This module is intentionally separate from `core.updater` (which does
 `git pull` for tracked repositories) to keep the two mental models
-apart: `updater` updates the fleet, `updater_self` updates gitpulse
+apart: `updater` updates the fleet, `updater_self` updates nostos
 itself.
 
 No code here executes a self-update without the caller's explicit
@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-_RELEASES_URL: str = "https://api.github.com/repos/prodrom3/gitpulse/releases/latest"
+_RELEASES_URL: str = "https://api.github.com/repos/prodrom3/nostos/releases/latest"
 
 
 class UpdateError(Exception):
@@ -42,7 +42,7 @@ def fetch_latest_release(
     fine for occasional checks (60 req/hour is plenty for humans).
     """
     req = urllib.request.Request(_RELEASES_URL, method="GET")
-    req.add_header("User-Agent", "gitpulse-self-update")
+    req.add_header("User-Agent", "nostos-self-update")
     req.add_header("Accept", "application/vnd.github+json")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
@@ -93,13 +93,13 @@ def is_newer(remote: str, local: str) -> bool:
 
 
 def _repo_root() -> str:
-    """Repo root of the currently running gitpulse, if any."""
+    """Repo root of the currently running nostos, if any."""
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return here
 
 
-def _looks_like_gitpulse_repo(path: str) -> bool:
-    """Does `path` look like a git checkout of prodrom3/gitpulse?"""
+def _looks_like_nostos_repo(path: str) -> bool:
+    """Does `path` look like a git checkout of prodrom3/nostos?"""
     git_dir = os.path.join(path, ".git")
     if not os.path.isdir(git_dir):
         return False
@@ -116,13 +116,13 @@ def _looks_like_gitpulse_repo(path: str) -> bool:
             timeout=10,
         )
         url = (result.stdout or "").strip().lower()
-        return "prodrom3/gitpulse" in url or "gitpulse" in url
+        return "prodrom3/nostos" in url or "nostos" in url
     except (OSError, subprocess.TimeoutExpired):
         return True
 
 
-def _pipx_has_gitpulse() -> bool:
-    """Best-effort check: `pipx list --json` mentions gitpulse."""
+def _pipx_has_nostos() -> bool:
+    """Best-effort check: `pipx list --json` mentions nostos."""
     if shutil.which("pipx") is None:
         return False
     try:
@@ -138,11 +138,11 @@ def _pipx_has_gitpulse() -> bool:
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         return False
     venvs = data.get("venvs") if isinstance(data, dict) else None
-    return isinstance(venvs, dict) and "gitpulse" in venvs
+    return isinstance(venvs, dict) and "nostos" in venvs
 
 
 def detect_install_method() -> dict[str, Any]:
-    """Return a dict describing how the running gitpulse was installed.
+    """Return a dict describing how the running nostos was installed.
 
     Keys:
         method: 'source' | 'pipx' | 'pip' | 'unknown'
@@ -151,25 +151,25 @@ def detect_install_method() -> dict[str, Any]:
         notes: human hint for the caller to print
     """
     root = _repo_root()
-    if _looks_like_gitpulse_repo(root):
+    if _looks_like_nostos_repo(root):
         return {
             "method": "source",
             "source_dir": root,
             "upgrade_cmd": f"git -C {root} pull --ff-only",
             "notes": "Updating will fast-forward your local checkout.",
         }
-    if _pipx_has_gitpulse():
+    if _pipx_has_nostos():
         return {
             "method": "pipx",
             "source_dir": None,
-            "upgrade_cmd": "pipx upgrade gitpulse",
-            "notes": "Updating will reinstall gitpulse into its pipx venv.",
+            "upgrade_cmd": "pipx upgrade nostos",
+            "notes": "Updating will reinstall nostos into its pipx venv.",
         }
     return {
         "method": "pip",
         "source_dir": None,
         "upgrade_cmd": (
-            "pip install --upgrade git+https://github.com/prodrom3/gitpulse.git"
+            "pip install --upgrade git+https://github.com/prodrom3/nostos.git"
         ),
         "notes": (
             "Could not auto-detect a source clone or pipx install. If you "
@@ -236,7 +236,7 @@ def run_upgrade(detection: dict[str, Any], *, timeout: float = 300.0) -> str:
 
     Only safe methods are run automatically:
     - 'source': a `git -C <root> pull --ff-only` in the known repo.
-    - 'pipx':   `pipx upgrade gitpulse`.
+    - 'pipx':   `pipx upgrade nostos`.
 
     For method='pip' we deliberately return the recommended command as
     text; we never invoke pip ourselves because the right invocation
@@ -248,7 +248,7 @@ def run_upgrade(detection: dict[str, Any], *, timeout: float = 300.0) -> str:
         root = detection["source_dir"]
         return _run(["git", "-C", root, "pull", "--ff-only"], timeout)
     if method == "pipx":
-        return _run(["pipx", "upgrade", "gitpulse"], timeout)
+        return _run(["pipx", "upgrade", "nostos"], timeout)
     raise UpdateError(
         "automatic upgrade is not supported for this install method; "
         f"run manually: {detection.get('upgrade_cmd')}"
