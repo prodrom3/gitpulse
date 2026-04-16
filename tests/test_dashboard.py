@@ -13,6 +13,10 @@ from core import index
 from core.commands import dashboard as cmd_dashboard
 
 
+def _R(path: str) -> str:
+    return os.path.realpath(os.path.expanduser(path))
+
+
 class TestRenderHtml(unittest.TestCase):
     def test_minimal_digest_renders(self):
         digest = {
@@ -116,7 +120,7 @@ class TestDashboardCommand(_IndexTestCase):
             rc = cmd_dashboard.run(self._args())
         self.assertEqual(rc, 0)
         self.assertIn("<!DOCTYPE html>", out.getvalue())
-        self.assertIn("/t/a", out.getvalue())
+        self.assertIn(_R("/t/a"), out.getvalue())
 
     def test_out_file_writes(self):
         out_path = os.path.join(self.tmp, "report.html")
