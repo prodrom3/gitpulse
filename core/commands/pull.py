@@ -226,7 +226,7 @@ def run(args: argparse.Namespace) -> int:
                     args.timeout,
                     env,
                     args.fetch_only,
-                    args.tags,
+                    getattr(args, "tags", False),
                 )
                 futures[future] = repo
 
