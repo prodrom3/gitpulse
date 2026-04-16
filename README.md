@@ -7,8 +7,6 @@
 [![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
-> **nostos** is a Python CLI for batch-updating and curating fleets of git repositories in parallel. Built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
-
 ```
  _ __   ___  ___| |_ ___  ___
 | '_ \ / _ \/ __| __/ _ \/ __|
@@ -17,6 +15,8 @@
 
   the homecoming - a fleet of git repositories
 ```
+
+> **nostos** is a Python CLI for batch-updating and curating fleets of git repositories in parallel. Built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
 
 ---
 
