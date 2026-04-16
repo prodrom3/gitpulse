@@ -9,9 +9,14 @@
 
 > **nostos** is a Python CLI for batch-updating and curating fleets of git repositories in parallel. Built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
 
-<p align="center">
-  <img width="360" height="360" src="https://github.com/prodrom3/gitpulse/assets/7604466/91c585dc-ef92-48f1-8461-60b4fcbcfb6d" alt="nostos logo">
-</p>
+```
+ _ __   ___  ___| |_ ___  ___
+| '_ \ / _ \/ __| __/ _ \/ __|
+| | | | (_) \__ \ || (_) \__ \
+|_| |_|\___/|___/\__\___/|___/
+
+  the homecoming - a fleet of git repositories
+```
 
 ---
 
