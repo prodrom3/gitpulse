@@ -137,6 +137,26 @@ class TestFetchRepo(unittest.TestCase):
         self.assertEqual(count, -1)
         self.assertIn("timed out", err)
 
+    @mock.patch("core.updater.subprocess.run")
+    def test_fetch_without_tags_uses_plain_fetch(self, mock_run):
+        mock_run.side_effect = _mock_run([
+            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 0, "0\n", ""),
+        ])
+        fetch_repo("/tmp/repo", timeout=30)
+        fetch_cmd = mock_run.call_args_list[0][0][0]
+        self.assertEqual(fetch_cmd, ["git", "fetch"])
+
+    @mock.patch("core.updater.subprocess.run")
+    def test_fetch_with_tags_passes_tags_flag(self, mock_run):
+        mock_run.side_effect = _mock_run([
+            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 0, "0\n", ""),
+        ])
+        fetch_repo("/tmp/repo", timeout=30, fetch_tags=True)
+        fetch_cmd = mock_run.call_args_list[0][0][0]
+        self.assertEqual(fetch_cmd, ["git", "fetch", "--tags"])
+
 
 class TestUpdateRepository(unittest.TestCase):
     @mock.patch("core.updater.get_remote_url", return_value="https://github.com/user/repo")
@@ -186,6 +206,32 @@ class TestUpdateRepository(unittest.TestCase):
         self.assertEqual(result.status, RepoStatus.UPDATED)
         cmd = mock_run.call_args[0][0]
         self.assertEqual(cmd, ["git", "pull", "--rebase"])
+
+    @mock.patch("core.updater.subprocess.run")
+    @mock.patch("core.updater.get_remote_url", return_value="https://github.com/user/repo")
+    @mock.patch("core.updater.fetch_repo", return_value=(2, None))
+    @mock.patch("core.updater.check_repo_state", return_value=(True, None, "main"))
+    def test_pull_with_tags(self, mock_state, mock_fetch, mock_url, mock_run):
+        mock_run.return_value = subprocess.CompletedProcess([], 0, "Updating\n", "")
+        result = update_repository("/tmp/repo", fetch_tags=True)
+        self.assertEqual(result.status, RepoStatus.UPDATED)
+        cmd = mock_run.call_args[0][0]
+        self.assertEqual(cmd, ["git", "pull", "--tags"])
+        # fetch_repo should have been called with fetch_tags=True
+        mock_fetch.assert_called_once()
+        _, kwargs = mock_fetch.call_args
+        self.assertTrue(kwargs.get("fetch_tags"))
+
+    @mock.patch("core.updater.subprocess.run")
+    @mock.patch("core.updater.get_remote_url", return_value="https://github.com/user/repo")
+    @mock.patch("core.updater.fetch_repo", return_value=(2, None))
+    @mock.patch("core.updater.check_repo_state", return_value=(True, None, "main"))
+    def test_pull_with_rebase_and_tags(self, mock_state, mock_fetch, mock_url, mock_run):
+        mock_run.return_value = subprocess.CompletedProcess([], 0, "Rebasing\n", "")
+        result = update_repository("/tmp/repo", rebase=True, fetch_tags=True)
+        self.assertEqual(result.status, RepoStatus.UPDATED)
+        cmd = mock_run.call_args[0][0]
+        self.assertEqual(cmd, ["git", "pull", "--rebase", "--tags"])
 
     @mock.patch("core.updater.subprocess.run")
     @mock.patch("core.updater.get_remote_url", return_value="https://github.com/user/repo")

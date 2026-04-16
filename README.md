@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.6.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.8.0-orange.svg)](./VERSION)
 [![PyPI](https://img.shields.io/pypi/v/gitpulse.svg)](https://pypi.org/project/gitpulse/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
@@ -187,6 +187,68 @@ pipx install git+https://github.com/prodrom3/gitpulse.git
 ```bash
 gitpulse --version        # prints the package version
 gitpulse --help           # prints usage
+```
+
+### Shell tab-completion (optional)
+
+gitpulse supports tab-completion for all verbs and flags via [argcomplete](https://kislyuk.github.io/argcomplete/). This is entirely opt-in; gitpulse has no hard dependency on it.
+
+**1. Install argcomplete into the same environment as gitpulse:**
+
+```bash
+# pipx install
+pipx inject gitpulse argcomplete
+
+# venv install
+pip install 'gitpulse[completion]'
+
+# system-wide via your package manager (examples)
+sudo apt install python3-argcomplete     # Debian / Ubuntu / Kali
+brew install argcomplete                 # macOS (Homebrew)
+```
+
+**2. Register the completion script for your shell:**
+
+**bash** (Linux, macOS, Git Bash, WSL):
+
+```bash
+# one-time, recommended: enable global argcomplete
+activate-global-python-argcomplete --user
+
+# or per-command in ~/.bashrc
+eval "$(register-python-argcomplete gitpulse)"
+```
+
+**zsh** (Kali default, macOS default since Catalina):
+
+```bash
+# Add to ~/.zshrc once
+autoload -U bashcompinit && bashcompinit
+eval "$(register-python-argcomplete gitpulse)"
+```
+
+Then open a new shell (or `source ~/.zshrc` / `source ~/.bashrc`) and try:
+
+```bash
+gitpulse <TAB><TAB>          # lists all verbs
+gitpulse pull --<TAB><TAB>   # lists all pull flags
+```
+
+**fish:**
+
+```fish
+register-python-argcomplete --shell fish gitpulse | source
+```
+
+Add the same line to `~/.config/fish/config.fish` to persist.
+
+**Windows PowerShell / cmd:** argcomplete does not officially support native Windows shells. Use Git Bash, WSL, or Windows Terminal + WSL for tab-completion. Everything else in gitpulse works fine on native Windows.
+
+If tab-completion isn't firing after setup, verify argcomplete can see the marker:
+
+```bash
+python -c "import argcomplete, sys; print(argcomplete.__version__)"
+grep -l PYTHON_ARGCOMPLETE_OK $(which gitpulse)
 ```
 
 ---

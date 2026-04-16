@@ -60,6 +60,11 @@ def add_parser(subparsers: Any) -> None:
         help="Only fetch from remotes; do not merge or rebase",
     )
     p.add_argument(
+        "--tags",
+        action="store_true",
+        help="Also fetch all remote tags (git fetch --tags / git pull --tags)",
+    )
+    p.add_argument(
         "--rebase",
         action="store_true",
         default=config["rebase"],
@@ -221,6 +226,7 @@ def run(args: argparse.Namespace) -> int:
                     args.timeout,
                     env,
                     args.fetch_only,
+                    args.tags,
                 )
                 futures[future] = repo
 

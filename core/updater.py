@@ -122,11 +122,19 @@ def fetch_repo(
     repo_path: str,
     timeout: int,
     env: dict[str, str] | None = None,
+    fetch_tags: bool = False,
 ) -> tuple[int, str | None]:
-    """Fetch from remote. Returns (behind_count, error_message)."""
+    """Fetch from remote. Returns (behind_count, error_message).
+
+    If fetch_tags is True, also fetches all remote tags (not just those
+    reachable from fetched branches).
+    """
+    fetch_cmd = ["git", "fetch"]
+    if fetch_tags:
+        fetch_cmd.append("--tags")
     try:
         subprocess.run(
-            ["git", "fetch"],
+            fetch_cmd,
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -156,6 +164,7 @@ def update_repository(
     timeout: int = DEFAULT_TIMEOUT,
     env: dict[str, str] | None = None,
     fetch_only: bool = False,
+    fetch_tags: bool = False,
 ) -> RepoResult:
     """Pull (or fetch) a single repository. Returns a RepoResult."""
     logging.info(f"Checking: {repo_path}")
@@ -167,7 +176,7 @@ def update_repository(
         logging.warning(f"Skipping {repo_path}: {reason}")
         return RepoResult(repo_path, RepoStatus.SKIPPED, reason, branch, remote_url)
 
-    behind_count, fetch_error = fetch_repo(repo_path, timeout, env=env)
+    behind_count, fetch_error = fetch_repo(repo_path, timeout, env=env, fetch_tags=fetch_tags)
 
     if fetch_error:
         logging.error(f"Failed to fetch {repo_path}: {fetch_error}")
@@ -187,6 +196,8 @@ def update_repository(
     cmd = ["git", "pull"]
     if rebase:
         cmd.append("--rebase")
+    if fetch_tags:
+        cmd.append("--tags")
 
     try:
         result = subprocess.run(

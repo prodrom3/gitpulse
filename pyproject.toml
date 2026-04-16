@@ -29,6 +29,9 @@ classifiers = [
     "Topic :: Software Development :: Version Control :: Git",
 ]
 
+[project.optional-dependencies]
+completion = ["argcomplete>=3.0"]
+
 [project.scripts]
 gitpulse = "core.cli:main_entry"
 

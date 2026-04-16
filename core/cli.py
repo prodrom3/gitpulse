@@ -7,6 +7,8 @@ top-level flags (--add, --remove, --list) are rewritten to their
 subcommand equivalents and emit a deprecation notice.
 """
 
+# PYTHON_ARGCOMPLETE_OK
+
 from __future__ import annotations
 
 import argparse
@@ -66,7 +68,28 @@ def get_version() -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gitpulse",
-        description="Batch-update and curate a fleet of git repositories.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "gitpulse - manage a fleet of git repositories.\n"
+            "\n"
+            "Pull updates in parallel, maintain a curated index with tags, "
+            "status, and notes, probe upstream metadata (stars, archived, "
+            "last push), generate weekly digests and HTML dashboards, "
+            "bridge to an Obsidian vault, and export portable bundles "
+            "that move cleanly between machines."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  gitpulse pull ~/code               Pull every repo under ~/code\n"
+            "  gitpulse pull --from-index --tags  Pull indexed repos + all their git tags\n"
+            "  gitpulse add URL --tag python      Clone a remote repo and register it\n"
+            "  gitpulse list --tag security       Show indexed repos carrying a tag\n"
+            "  gitpulse refresh                   Fetch upstream metadata for the index\n"
+            "  gitpulse export --out fleet.json   Export the full index for portability\n"
+            "\n"
+            "Run `gitpulse <command> --help` for flags on a specific command.\n"
+            "Docs: https://github.com/prodrom3/gitpulse"
+        ),
     )
     parser.add_argument(
         "-v",
@@ -74,24 +97,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"%(prog)s {get_version()}",
     )
-    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
+    subparsers = parser.add_subparsers(
+        title="commands",
+        dest="command",
+        metavar="COMMAND",
+    )
+    # Group the verbs in a logical order so `--help` reads top to bottom.
+    # Core pull / index intake:
     _cmd_pull.add_parser(subparsers)
     _cmd_add.add_parser(subparsers)
+    # Index inspection & editing:
     _cmd_list.add_parser(subparsers)
     _cmd_show.add_parser(subparsers)
     _cmd_tag.add_parser(subparsers)
     _cmd_note.add_parser(subparsers)
     _cmd_triage.add_parser(subparsers)
     _cmd_rm.add_parser(subparsers)
+    # Upstream intelligence & reporting:
     _cmd_refresh.add_parser(subparsers)
     _cmd_digest.add_parser(subparsers)
+    _cmd_dashboard.add_parser(subparsers)
+    _cmd_attack.add_parser(subparsers)
+    # External bridges & portability:
     _cmd_vault.add_parser(subparsers)
     _cmd_export.add_parser(subparsers)
     _cmd_import.add_parser(subparsers)
+    # Operational / housekeeping:
     _cmd_update.add_parser(subparsers)
     _cmd_doctor.add_parser(subparsers)
-    _cmd_attack.add_parser(subparsers)
-    _cmd_dashboard.add_parser(subparsers)
     return parser
 
 
@@ -159,6 +192,17 @@ def run(argv: list[str] | None = None) -> int:
     argv = _inject_default_verb(argv)
 
     parser = build_parser()
+
+    # Optional shell tab-completion. Only active if argcomplete is installed
+    # and the shell invoked us in completion mode. Silently no-ops otherwise,
+    # so we don't make argcomplete a hard dependency.
+    try:
+        import argcomplete  # type: ignore[import-not-found]
+
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
+
     args = parser.parse_args(argv)
 
     func = getattr(args, "func", None)

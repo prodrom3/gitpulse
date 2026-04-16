@@ -6,6 +6,8 @@ runs, and so the pip-installed `gitpulse` console script can reach
 the same code path via `core.cli.main_entry`.
 """
 
+# PYTHON_ARGCOMPLETE_OK
+
 import sys
 
 from core.cli import run
