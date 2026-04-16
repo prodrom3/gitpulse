@@ -16,7 +16,9 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
 from .commands import add as _cmd_add
+from .commands import attack as _cmd_attack
 from .commands import digest as _cmd_digest
+from .commands import doctor as _cmd_doctor
 from .commands import export_cmd as _cmd_export
 from .commands import import_cmd as _cmd_import
 from .commands import list_cmd as _cmd_list
@@ -33,7 +35,8 @@ from .commands import vault as _cmd_vault
 _KNOWN_VERBS: frozenset[str] = frozenset(
     {
         "pull", "add", "list", "show", "tag", "note", "triage",
-        "rm", "refresh", "digest", "vault", "export", "import", "update",
+        "rm", "refresh", "digest", "vault", "export", "import",
+        "update", "doctor", "attack",
     }
 )
 
@@ -85,6 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
     _cmd_export.add_parser(subparsers)
     _cmd_import.add_parser(subparsers)
     _cmd_update.add_parser(subparsers)
+    _cmd_doctor.add_parser(subparsers)
+    _cmd_attack.add_parser(subparsers)
     return parser
 
 

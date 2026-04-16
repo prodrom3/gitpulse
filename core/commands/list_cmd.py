@@ -33,6 +33,12 @@ def add_parser(subparsers: Any) -> None:
         help="Only repos not pulled / shown in the last DAYS days",
     )
     p.add_argument(
+        "--attack",
+        default=None,
+        metavar="TNNNN",
+        help="Only repos tagged with this ATT&CK technique (e.g. T1059)",
+    )
+    p.add_argument(
         "--upstream-archived",
         action="store_true",
         help="Only repos whose upstream is archived (run `refresh` first)",
@@ -113,11 +119,19 @@ def _strip_ansi(s: str) -> str:
 def run(args: argparse.Namespace) -> int:
     maybe_migrate_watchlist()
 
+    # --attack TNNNN is a convenience alias for --tag attack:tnnnn
+    tag_filter = args.tag
+    attack_filter = getattr(args, "attack", None)
+    if attack_filter:
+        from ..taxonomy import normalize_attack_tag
+
+        tag_filter = normalize_attack_tag(attack_filter)
+
     try:
         with _index.connect() as conn:
             repos = _index.list_repos(
                 conn,
-                tag=args.tag,
+                tag=tag_filter,
                 status=args.status,
                 untouched_days=args.untouched_over,
                 upstream_archived=getattr(args, "upstream_archived", False),
