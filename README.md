@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/nostos/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/nostos/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-1.1.0-orange.svg)](./VERSION)
 [![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
@@ -739,12 +739,13 @@ nostos export --out /backup/nostos.json
 nostos export --out share.json --redact --pretty
 ```
 
-The bundle carries: `schema` (currently 1), `exported_at`, `nostos_version`, `redacted` flag, and a `repos[]` array. Each repo entry includes path, remote_url (null if redacted), source (null if redacted), status, quiet flag, timestamps, tags, notes (empty if redacted), and the latest `upstream` metadata snapshot.
+The bundle is schema-versioned (`schema` integer at the top level). `nostos` 1.1.0+ writes schema **2** and reads both schema 1 (legacy gitpulse / earlier nostos) and schema 2. See the schema block below for the full field list.
 
 ### Import
 
 ```bash
-# Default: additive merge into the current index
+# Default: additive merge into the current index. Clones any repo
+# entries whose local path does not resolve but that carry a remote_url.
 nostos import bundle.json
 
 # From stdin - end-to-end pipe between machines
@@ -753,12 +754,32 @@ nostos export | ssh ops-box "nostos import -"
 # Cross-machine path rewrite (Alice's paths -> Bob's paths)
 nostos import bundle.json --remap /home/alice:/home/bob
 
+# Explicit clone destination (beats ~/.nostosrc clone_dir, beats $HOME)
+nostos import bundle.json --clone-dir ~/repos
+
+# Metadata-only: never touch the network, even for unresolved entries
+nostos import bundle.json --no-clone
+
+# Parallel cloning (default: 4)
+nostos import bundle.json --clone-workers 8
+
 # Wipe-and-replace mode (privileged; requires --yes for non-interactive use)
 nostos import bundle.json --replace --yes
 
-# Preview without writing
-nostos import bundle.json --dry-run --json
+# Preview: print the resolution plan, per-entry, then exit
+nostos import bundle.json --dry-run
 ```
+
+**Resolution algorithm (per entry):**
+
+1. Apply `--remap` rules to the bundle's absolute `path`.
+2. If that path exists locally and is a git repo, register it.
+3. Otherwise, if the entry carries `path_relative_to_home` (schema 2 only), try `$HOME/<that>`; register if present.
+4. Otherwise, if `--no-clone` is set, register the entry with its post-remap path as a placeholder (no file mirror).
+5. Otherwise, if `remote_url` is set, clone to `<clone-dir>/<local_name>` using the same hardened clone routine as `nostos add` (`--no-checkout`, git hooks disabled).
+6. Otherwise, skip the entry and print a hint.
+
+The resolution reason for each entry is visible in `--dry-run` and in the `resolution` breakdown of the JSON summary.
 
 **Merge semantics (default):**
 - Repos in the bundle that are not in the local index are **added**.
@@ -772,17 +793,28 @@ nostos import bundle.json --dry-run --json
 - Without `--yes` the command prompts interactively; empty / `n` aborts with exit code 1.
 - Typical use: disaster recovery, migrating to a new host, rotating workstations.
 
+**Clone-on-import:**
+- Cloning happens in a second pass after all resolvable entries are registered, parallelised across `--clone-workers`. A clone failure leaves the entry out of the index on that pass (count in `clone_failed`); re-running the import retries only the missing ones.
+- `clone_dir` defaults to `clone_dir` in `~/.nostosrc`, falling back to `$HOME`.
+- Hooks are disabled via `GIT_CONFIG_*` env vars to mitigate CVE-2024-32002 / 32004 / 32465.
+
 ### Bundle schema (stable)
+
+Current format (schema 2, written by nostos 1.1.0+):
 
 ```json
 {
-  "schema": 1,
-  "exported_at": "2026-04-15T15:30:00+00:00",
-  "nostos_version": "2.4.0",
+  "schema": 2,
+  "exported_at": "2026-04-17T15:30:00+00:00",
+  "nostos_version": "1.1.0",
+  "source_host": "alice-workstation",
+  "source_platform": "linux",
   "redacted": false,
   "repos": [
     {
-      "path": "/home/user/tools/repo",
+      "path": "/home/alice/tools/repo",
+      "path_relative_to_home": "tools/repo",
+      "local_name": "repo",
       "remote_url": "git@github.com:org/repo.git",
       "source": "blog:...",
       "status": "in-use",
@@ -804,6 +836,24 @@ nostos import bundle.json --dry-run --json
   ]
 }
 ```
+
+**Field semantics:**
+
+| Field | Added in | Purpose |
+|---|---|---|
+| `schema` | 1 | Integer, selects read/write rules. Current writer emits `2`. |
+| `exported_at` | 1 | ISO-8601 UTC timestamp of when the bundle was produced. |
+| `nostos_version` | 1 | Informational - the nostos version that wrote the bundle. |
+| `source_host` | 2 | Hostname of the exporting machine. For debugging import mismatches. |
+| `source_platform` | 2 | Platform name (linux / darwin / windows). Informational. |
+| `redacted` | 1 | `true` when notes/source/remote_url were stripped at export time. |
+| `repos[].path` | 1 | Original absolute path on the exporting host. Primary key. |
+| `repos[].path_relative_to_home` | 2 | Same path expressed relative to `$HOME` (forward slashes), or `null` if the path was not under `$HOME`. The cross-OS resolution fallback. |
+| `repos[].local_name` | 2 | Basename hint used when cloning into `--clone-dir` on import. |
+| `repos[].remote_url` | 1 | The `origin` URL. Used as the clone source when no local path resolves. |
+| `repos[].source` through `repos[].upstream` | 1 | Unchanged from schema 1. |
+
+A schema-1 bundle (missing the three schema-2 fields) imports cleanly on nostos 1.1.0+ via the resolution algorithm's fallbacks.
 
 ---
 
