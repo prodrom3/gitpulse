@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/nostos/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/nostos/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-1.2.0-orange.svg)](./VERSION)
 [![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
@@ -189,67 +189,50 @@ nostos --version        # prints the package version
 nostos --help           # prints usage
 ```
 
-### Shell tab-completion (optional)
+### Shell tab-completion
 
-nostos supports tab-completion for all verbs and flags via [argcomplete](https://kislyuk.github.io/argcomplete/). This is entirely opt-in; nostos has no hard dependency on it.
+Tab-completion for all verbs and flags is built in. `argcomplete` is a required dependency, so every install of nostos has it already.
 
-**1. Install argcomplete into the same environment as nostos:**
-
-```bash
-# pipx install
-pipx inject nostos argcomplete
-
-# venv install
-pip install 'nostos[completion]'
-
-# system-wide via your package manager (examples)
-sudo apt install python3-argcomplete     # Debian / Ubuntu / Kali
-brew install argcomplete                 # macOS (Homebrew)
-```
-
-**2. Register the completion script for your shell:**
-
-**bash** (Linux, macOS, Git Bash, WSL):
+**One-line setup:**
 
 ```bash
-# one-time, recommended: enable global argcomplete
-activate-global-python-argcomplete --user
-
-# or per-command in ~/.bashrc
-eval "$(register-python-argcomplete nostos)"
+nostos completion install
 ```
 
-**zsh** (Kali default, macOS default since Catalina):
+This detects your shell (`$SHELL`), generates the native completion snippet, and appends a managed block to the right config file:
 
-```bash
-# Add to ~/.zshrc once
-autoload -U bashcompinit && bashcompinit
-eval "$(register-python-argcomplete nostos)"
-```
+| Shell | Managed block goes into |
+|---|---|
+| bash | `~/.bashrc` |
+| zsh | `~/.zshrc` |
+| fish | `~/.config/fish/conf.d/nostos.fish` |
 
-Then open a new shell (or `source ~/.zshrc` / `source ~/.bashrc`) and try:
+Reload your shell (`exec $SHELL`) or open a new terminal, then:
 
 ```bash
 nostos <TAB><TAB>          # lists all verbs
 nostos pull --<TAB><TAB>   # lists all pull flags
 ```
 
-**fish:**
-
-```fish
-register-python-argcomplete --shell fish nostos | source
-```
-
-Add the same line to `~/.config/fish/config.fish` to persist.
-
-**Windows PowerShell / cmd:** argcomplete does not officially support native Windows shells. Use Git Bash, WSL, or Windows Terminal + WSL for tab-completion. Everything else in nostos works fine on native Windows.
-
-If tab-completion isn't firing after setup, verify argcomplete can see the marker:
+**Other verbs:**
 
 ```bash
-python -c "import argcomplete, sys; print(argcomplete.__version__)"
-grep -l PYTHON_ARGCOMPLETE_OK $(which nostos)
+# Print the snippet without modifying any file
+nostos completion show
+
+# Install into a specific shell or file
+nostos completion install --shell zsh
+nostos completion install --shell bash --rc-file ~/.config/bash/nostos.bash
+
+# Remove the managed block cleanly
+nostos completion uninstall
 ```
+
+The block is bracketed with `# BEGIN nostos completion` / `# END nostos completion` markers. Re-running `install` is idempotent (and replaces the block if the generated snippet changes between versions).
+
+**Why native output (not `register-python-argcomplete nostos` directly):** nostos uses `register-python-argcomplete --shell {bash,zsh,fish}` so the generated snippet doesn't depend on zsh's `bashcompinit` bridge. Older advice to `eval "$(register-python-argcomplete nostos)"` trips up zsh users who haven't ordered their compinit / bashcompinit calls correctly - `nostos completion install` sidesteps the problem.
+
+**Windows PowerShell / cmd:** argcomplete does not support native Windows shells upstream. Use Git Bash or WSL on Windows. Everything else in nostos works fine on native Windows regardless.
 
 ---
 

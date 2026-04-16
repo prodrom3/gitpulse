@@ -19,6 +19,7 @@ from importlib.metadata import version as _pkg_version
 
 from .commands import add as _cmd_add
 from .commands import attack as _cmd_attack
+from .commands import completion as _cmd_completion
 from .commands import dashboard as _cmd_dashboard
 from .commands import digest as _cmd_digest
 from .commands import doctor as _cmd_doctor
@@ -39,7 +40,7 @@ _KNOWN_VERBS: frozenset[str] = frozenset(
     {
         "pull", "add", "list", "show", "tag", "note", "triage",
         "rm", "refresh", "digest", "vault", "export", "import",
-        "update", "doctor", "attack", "dashboard",
+        "update", "doctor", "attack", "dashboard", "completion",
     }
 )
 
@@ -125,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Operational / housekeeping:
     _cmd_update.add_parser(subparsers)
     _cmd_doctor.add_parser(subparsers)
+    _cmd_completion.add_parser(subparsers)
     return parser
 
 

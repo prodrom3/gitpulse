@@ -29,8 +29,9 @@ classifiers = [
     "Topic :: Software Development :: Version Control :: Git",
 ]
 
-[project.optional-dependencies]
-completion = ["argcomplete>=3.0"]
+dependencies = [
+    "argcomplete>=3.0",
+]
 
 [project.scripts]
 nostos = "core.cli:main_entry"
