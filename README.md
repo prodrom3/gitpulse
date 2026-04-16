@@ -3,7 +3,8 @@
 [![CI](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/gitpulse/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-2.5.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.6.0-orange.svg)](./VERSION)
+[![PyPI](https://img.shields.io/pypi/v/gitpulse.svg)](https://pypi.org/project/gitpulse/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 > **gitpulse** is a zero-dependency Python CLI for batch-updating fleets of git repositories in parallel. It is built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
@@ -214,6 +215,9 @@ gitpulse [verb] [options]
 | `export` | Write a schema-versioned JSON bundle of the index (portable; supports redaction). |
 | `import` | Load a bundle into the index (merge by default; `--replace` wipes; `--remap` rewrites paths). |
 | `update` | Check for / apply a gitpulse self-update. Auto-detects source clone / pipx / pip. |
+| `doctor` | Index health check: stale paths, missing remotes, orphan vault files. `--fix` auto-remediates. |
+| `attack list` | Print the built-in MITRE ATT&CK technique lookup table. |
+| `attack tag` | Tag a repo with ATT&CK technique IDs (shorthand for `+attack:TNNNN`). |
 | `rm` | Remove a repo from the index (optionally `--purge` the clone). |
 
 ### CLI reference
