@@ -260,7 +260,9 @@ class TestRm(_IndexTestCase):
         repo = self._make_repo("gone")
         with index.connect(self.db) as conn:
             index.add_repo(conn, repo)
-        args = argparse.Namespace(target=repo, purge=False, yes=False)
+        args = argparse.Namespace(
+            target=repo, purge=False, cleanup_vault=False, yes=False
+        )
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             rc = cmd_rm.run(args)
         self.assertEqual(rc, 0)
@@ -272,13 +274,39 @@ class TestRm(_IndexTestCase):
         repo = self._make_repo("gone2")
         with index.connect(self.db) as conn:
             index.add_repo(conn, repo)
-        args = argparse.Namespace(target=repo, purge=True, yes=True)
+        args = argparse.Namespace(
+            target=repo, purge=True, cleanup_vault=False, yes=True
+        )
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             cmd_rm.run(args)
         self.assertFalse(os.path.exists(repo))
 
+    def test_rm_cleanup_vault_deletes_md(self):
+        vault_dir = os.path.join(self.tmp, "vault")
+        repos_dir = os.path.join(vault_dir, "repos")
+        os.makedirs(repos_dir)
+        repo = self._make_repo("vaulted")
+        with index.connect(self.db) as conn:
+            index.add_repo(conn, repo)
+        # Create a matching vault file (slug = "vaulted")
+        md_path = os.path.join(repos_dir, "vaulted.md")
+        with open(md_path, "w") as f:
+            f.write("---\ngitpulse_id: 1\n---\n")
+        args = argparse.Namespace(
+            target=repo, purge=False, cleanup_vault=True, yes=False
+        )
+        with mock.patch(
+            "core.commands.rm.load_config",
+            return_value={"vault_path": vault_dir, "vault_subdir": "repos"},
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_rm.run(args)
+        self.assertEqual(rc, 0)
+        self.assertFalse(os.path.exists(md_path))  # vault file removed
+
     def test_rm_missing_repo(self):
-        args = argparse.Namespace(target="/nope", purge=False, yes=False)
+        args = argparse.Namespace(
+            target="/nope", purge=False, cleanup_vault=False, yes=False
+        )
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             rc = cmd_rm.run(args)
         self.assertEqual(rc, 1)

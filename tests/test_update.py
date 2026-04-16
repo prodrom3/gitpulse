@@ -155,9 +155,52 @@ class TestRunUpgrade(unittest.TestCase):
                 )
 
 
+class TestVerifyReleaseTag(unittest.TestCase):
+    def test_valid_signature(self):
+        with mock.patch("subprocess.run") as mr:
+            # First call is fetch --tags; second is verify-tag
+            mr.side_effect = [
+                mock.Mock(returncode=0, stdout="", stderr=""),
+                mock.Mock(returncode=0, stdout="Good signature", stderr=""),
+            ]
+            ok, out = _self.verify_release_tag("2.5.0", "/tmp/gp")
+        self.assertTrue(ok)
+        self.assertIn("Good signature", out)
+        # verify-tag must use v-prefixed tag
+        verify_call = mr.call_args_list[1][0][0]
+        self.assertIn("v2.5.0", verify_call)
+
+    def test_invalid_signature(self):
+        with mock.patch("subprocess.run") as mr:
+            mr.side_effect = [
+                mock.Mock(returncode=0, stdout="", stderr=""),
+                mock.Mock(returncode=1, stdout="", stderr="BAD signature"),
+            ]
+            ok, out = _self.verify_release_tag("2.5.0", "/tmp/gp")
+        self.assertFalse(ok)
+        self.assertIn("BAD signature", out)
+
+    def test_already_vprefixed_tag(self):
+        with mock.patch("subprocess.run") as mr:
+            mr.side_effect = [
+                mock.Mock(returncode=0, stdout="", stderr=""),
+                mock.Mock(returncode=0, stdout="ok", stderr=""),
+            ]
+            _self.verify_release_tag("v2.5.0", "/tmp/gp")
+        # Should NOT double-prefix to vv2.5.0
+        verify_call = mr.call_args_list[1][0][0]
+        self.assertIn("v2.5.0", verify_call)
+        self.assertNotIn("vv2.5.0", " ".join(verify_call))
+
+    def test_git_not_found_raises(self):
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError("git")):
+            with self.assertRaises(_self.UpdateError):
+                _self.verify_release_tag("2.5.0", "/tmp/gp")
+
+
 class TestUpdateCommand(unittest.TestCase):
     def _args(self, **overrides):
-        base = {"check": False, "offline": False, "yes": False}
+        base = {"check": False, "offline": False, "yes": False, "verify": False}
         base.update(overrides)
         return argparse.Namespace(**base)
 

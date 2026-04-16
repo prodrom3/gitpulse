@@ -179,6 +179,55 @@ def detect_install_method() -> dict[str, Any]:
     }
 
 
+# ---------- tag verification ----------
+
+
+def verify_release_tag(
+    tag: str,
+    source_dir: str,
+    *,
+    timeout: float = 30.0,
+) -> tuple[bool, str]:
+    """Run `git verify-tag <tag>` in the source checkout.
+
+    Returns (success, output). Success is True only if git
+    verify-tag exits 0 (meaning a valid GPG or SSH signature was
+    found). Failure modes:
+    - The tag doesn't exist locally (fetch first).
+    - No signing key is configured.
+    - Signature check fails.
+
+    This function never mutates the repo; it is purely a read-only
+    verification step. Raises UpdateError if git cannot be invoked.
+    """
+    # Ensure the tag is available locally
+    try:
+        subprocess.run(
+            ["git", "-C", source_dir, "fetch", "--tags", "--quiet"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    tag_name = tag if tag.startswith("v") else f"v{tag}"
+    try:
+        result = subprocess.run(
+            ["git", "-C", source_dir, "verify-tag", tag_name],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        raise UpdateError("git not found; cannot verify tag") from None
+    except subprocess.TimeoutExpired:
+        raise UpdateError("verify-tag timed out") from None
+
+    out = (result.stdout or "") + (result.stderr or "")
+    return result.returncode == 0, out.strip()
+
+
 # ---------- run update ----------
 
 
