@@ -168,13 +168,13 @@ def detect_install_method() -> dict[str, Any]:
     return {
         "method": "pip",
         "source_dir": None,
-        "upgrade_cmd": (
-            "pip install --upgrade git+https://github.com/prodrom3/nostos.git"
-        ),
+        "upgrade_cmd": "pip install --upgrade nostos",
         "notes": (
-            "Could not auto-detect a source clone or pipx install. If you "
-            "installed via pip, the suggested command above may need sudo "
-            "or --user depending on your environment; apply manually."
+            "Could not auto-detect a source clone or pipx install. The "
+            "suggested command installs the latest release from PyPI and "
+            "may need sudo or --user depending on your environment; apply "
+            "manually. To track git HEAD instead, run: "
+            "pip install --upgrade git+https://github.com/prodrom3/nostos.git"
         ),
     }
 
