@@ -8,10 +8,11 @@
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
 ```
- _ __   ___  ___| |_ ___  ___
-| '_ \ / _ \/ __| __/ _ \/ __|
-| | | | (_) \__ \ || (_) \__ \
-|_| |_|\___/|___/\__\___/|___/
+                     __
+   ____  ____  _____/ /_____  _____
+  / __ \/ __ \/ ___/ __/ __ \/ ___/
+ / / / / /_/ (__  ) /_/ /_/ (__  )
+/_/ /_/\____/____/\__/\____/____/
 
   the homecoming - a fleet of git repositories
 ```
