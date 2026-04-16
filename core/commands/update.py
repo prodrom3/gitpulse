@@ -51,6 +51,15 @@ def add_parser(subparsers: Any) -> None:
         action="store_true",
         help="Skip the confirm prompt when an upgrade is applied.",
     )
+    p.add_argument(
+        "--verify",
+        action="store_true",
+        help=(
+            "Verify the release tag signature via `git verify-tag` "
+            "(requires GPG or SSH signing configured in your git; "
+            "only meaningful for source-clone installs)."
+        ),
+    )
     p.set_defaults(func=run)
 
 
@@ -89,6 +98,36 @@ def run(args: argparse.Namespace) -> int:
         f"{'[update available]' if newer else '[up to date]'}"
     )
     print(summary)
+
+    if getattr(args, "verify", False) and detection["method"] == "source":
+        try:
+            ok, verify_out = _self.verify_release_tag(
+                remote, detection["source_dir"]
+            )
+        except _self.UpdateError as e:
+            return fail(f"tag verification failed: {e}")
+        if ok:
+            print(f"tag v{remote}: signature VALID", file=sys.stderr)
+            if verify_out:
+                print(f"  {verify_out}", file=sys.stderr)
+        else:
+            print(
+                f"tag v{remote}: signature could NOT be verified",
+                file=sys.stderr,
+            )
+            if verify_out:
+                print(f"  {verify_out}", file=sys.stderr)
+            if not args.yes:
+                return fail(
+                    "tag signature verification failed; pass --yes to "
+                    "override and upgrade anyway"
+                )
+    elif getattr(args, "verify", False):
+        print(
+            "note: --verify is only meaningful for source-clone installs; "
+            "skipping tag verification.",
+            file=sys.stderr,
+        )
 
     if args.check or not newer:
         return 0
