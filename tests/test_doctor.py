@@ -10,7 +10,7 @@ import unittest
 from unittest import mock
 
 from core import doctor as _doctor
-from core import index, vault
+from core import index
 from core.commands import doctor as cmd_doctor
 
 
