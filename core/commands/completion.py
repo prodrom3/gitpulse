@@ -140,7 +140,7 @@ def detect_shell() -> str | None:
 
 
 def resolve_shell(args: argparse.Namespace) -> str | None:
-    chosen = getattr(args, "shell", None)
+    chosen: str | None = getattr(args, "shell", None)
     if chosen:
         return chosen
     return detect_shell()
