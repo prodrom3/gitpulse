@@ -1,0 +1,126 @@
+# Reusable GitHub Actions workflow for automated fleet refresh.
+#
+# Copy this file to .github/workflows/fleet-refresh.yml in any repo
+# where you want gitpulse to run on a schedule (or on webhook events).
+#
+# Why this instead of a daemon / webhook listener:
+# gitpulse's security policy explicitly states "no daemon, no
+# listening socket." Running gitpulse as a scheduled CI job achieves
+# the same outcome (periodic refresh + alert on archived upstream)
+# without expanding the attack surface.
+#
+# How it works:
+# 1. Checks out the gitpulse source (or uses a pip-installed copy).
+# 2. Restores the metadata index from a cache artifact.
+# 3. Runs `gitpulse refresh` to probe upstream health.
+# 4. Runs `gitpulse digest --json` to produce the changeset report.
+# 5. Runs `gitpulse doctor --json` for index integrity.
+# 6. Optionally posts the digest to a Slack webhook or creates a
+#    GitHub Issue if archived repos are detected.
+# 7. Saves the updated index back to cache.
+#
+# Customise: adjust the cron schedule, the GITHUB_TOKEN env var for
+# upstream probes, and the notification step to match your setup.
+
+name: Fleet refresh
+
+on:
+  schedule:
+    # Monday 06:00 UTC - adjust to your timezone and cadence.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write  # only needed if you enable the "create issue" step
+
+env:
+  # Token for upstream probes (github.com). Use a fine-grained PAT
+  # stored as a repo secret. Omit if you only probe self-hosted hosts.
+  GITHUB_TOKEN: ${{ secrets.GITPULSE_PROBE_TOKEN }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gitpulse
+        uses: actions/checkout@v6
+        with:
+          repository: prodrom3/gitpulse
+          ref: master
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Restore the index from the last run so refresh builds on
+      # the existing cache rather than starting from scratch.
+      - name: Restore index cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/gitpulse
+          key: gitpulse-index-${{ github.repository }}
+          restore-keys: gitpulse-index-
+
+      # Copy your auth.toml into the expected location. In CI you
+      # would template this from secrets rather than committing it.
+      - name: Write auth config
+        run: |
+          mkdir -p ~/.config/gitpulse
+          chmod 700 ~/.config/gitpulse
+          cat > ~/.config/gitpulse/auth.toml <<'EOF'
+          [hosts."github.com"]
+          token_env = "GITHUB_TOKEN"
+          EOF
+          chmod 600 ~/.config/gitpulse/auth.toml
+
+      - name: Refresh upstream metadata
+        run: python gitpulse.py refresh --all --json > /tmp/refresh.json
+
+      - name: Generate digest
+        run: python gitpulse.py digest --json > /tmp/digest.json
+
+      - name: Run doctor
+        run: python gitpulse.py doctor --json > /tmp/doctor.json || true
+
+      # --- Notification step (example: post to Slack) ---
+      # Uncomment and set SLACK_WEBHOOK_URL as a repo secret.
+      #
+      # - name: Post digest to Slack
+      #   if: always()
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   run: |
+      #     archived=$(jq '.archived | length' /tmp/digest.json)
+      #     if [ "$archived" -gt 0 ]; then
+      #       curl -X POST "$SLACK_WEBHOOK_URL" \
+      #         -H 'Content-type: application/json' \
+      #         -d "{\"text\": \"gitpulse: $archived upstream repo(s) are archived. Run gitpulse list --upstream-archived for details.\"}"
+      #     fi
+
+      # --- Alternative: create a GitHub Issue on archived repos ---
+      # Uncomment to auto-create an issue when supply-chain flags fire.
+      #
+      # - name: Create issue on archived upstream
+      #   if: always()
+      #   run: |
+      #     archived=$(jq '.archived | length' /tmp/digest.json)
+      #     if [ "$archived" -gt 0 ]; then
+      #       gh issue create \
+      #         --title "gitpulse: $archived upstream repo(s) archived" \
+      #         --body "$(jq -r '.archived[] | .path' /tmp/digest.json | head -20)" \
+      #         --label "supply-chain"
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
+
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitpulse-reports
+          path: |
+            /tmp/refresh.json
+            /tmp/digest.json
+            /tmp/doctor.json
+          retention-days: 30
