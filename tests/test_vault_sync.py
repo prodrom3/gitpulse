@@ -87,6 +87,40 @@ class TestParseFrontmatter(unittest.TestCase):
         front, _ = vault.parse_frontmatter(text)
         self.assertEqual(front["note"], 'a "quoted" word')
 
+    def test_parse_notes_from_body(self):
+        body = (
+            "\n# org/repo\n\n"
+            "## Description\n\nA tool\n\n"
+            "## Notes\n\n"
+            "- **2026-04-14T10:00:00+00:00** - first note\n"
+            "- **2026-04-15T09:00:00+00:00** - second note\n"
+            "\n"
+        )
+        notes = vault.parse_notes_from_body(body)
+        self.assertEqual(len(notes), 2)
+        self.assertEqual(notes[0]["body"], "first note")
+        self.assertEqual(notes[0]["created_at"], "2026-04-14T10:00:00+00:00")
+        self.assertEqual(notes[1]["body"], "second note")
+
+    def test_parse_notes_empty_section(self):
+        body = "\n## Notes\n\n_No notes yet._\n"
+        notes = vault.parse_notes_from_body(body)
+        self.assertEqual(notes, [])
+
+    def test_parse_notes_no_section(self):
+        body = "\n# Just a title\n\nSome text.\n"
+        notes = vault.parse_notes_from_body(body)
+        self.assertEqual(notes, [])
+
+    def test_parse_notes_stops_at_next_section(self):
+        body = (
+            "\n## Notes\n\n"
+            "- **2026-04-14T10:00:00+00:00** - a note\n"
+            "\n## Other\n\nNot a note bullet.\n"
+        )
+        notes = vault.parse_notes_from_body(body)
+        self.assertEqual(len(notes), 1)
+
     def test_round_trip_with_writer(self):
         """Anything our writer emits must parse back to equivalent data."""
         written = vault._render_frontmatter(
@@ -123,14 +157,18 @@ class _FakeWriter:
         self.known_ids = set(known_ids)
         self.calls: list[dict] = []
 
-    def apply_edits(self, *, repo_id, status, tags):
-        self.calls.append({"repo_id": repo_id, "status": status, "tags": tags})
+    def apply_edits(self, *, repo_id, status, tags, new_notes=None):
+        self.calls.append({
+            "repo_id": repo_id, "status": status, "tags": tags,
+            "new_notes": new_notes,
+        })
         if repo_id not in self.known_ids:
             return {"repo_missing": True}
         return {
             "repo_missing": False,
             "status_changed": status is not None,
             "tags_changed": tags is not None,
+            "notes_added": len(new_notes) if new_notes else 0,
         }
 
 
@@ -338,6 +376,65 @@ class TestVaultSyncCommand(_IndexBackedTestCase):
         self.assertIn("files_scanned", data)
         self.assertIn("edits_applied", data)
         self.assertIn("orphans", data)
+
+    def test_note_added_in_obsidian_round_trips(self):
+        # 1. Seed DB with one repo and one existing note, then export.
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/t/a", status="new")
+            index.add_note(conn, rid, "existing note")
+        with mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+            "sys.stderr", new_callable=io.StringIO
+        ):
+            cmd_vault.run_export(
+                argparse.Namespace(
+                    vault_command="export", path=None, subdir=None, quiet=True
+                )
+            )
+
+        # 2. Simulate the operator adding a note bullet in the vault.
+        files = sorted(os.listdir(os.path.join(self.vault_dir, "repos")))
+        md_path = os.path.join(self.vault_dir, "repos", files[0])
+        with open(md_path) as f:
+            original = f.read()
+        # Append a new note bullet at the end of the file
+        with open(md_path, "w") as f:
+            f.write(
+                original.rstrip()
+                + "\n- **2026-04-16T08:00:00+00:00** - added in Obsidian\n"
+            )
+
+        # 3. Sync and verify the new note appears in the DB.
+        with mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+            "sys.stderr", new_callable=io.StringIO
+        ):
+            rc = cmd_vault.run_sync(self._sync_args())
+        self.assertEqual(rc, 0)
+
+        with index.connect(self.db) as conn:
+            notes = index.get_notes(conn, rid)
+        bodies = [n["body"] for n in notes]
+        self.assertIn("existing note", bodies)
+        self.assertIn("added in Obsidian", bodies)
+        self.assertEqual(len(bodies), 2)
+
+    def test_duplicate_note_not_re_added(self):
+        # Syncing twice should not duplicate notes.
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/t/a", status="new")
+            index.add_note(conn, rid, "existing")
+        with mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+            "sys.stderr", new_callable=io.StringIO
+        ):
+            cmd_vault.run_export(
+                argparse.Namespace(
+                    vault_command="export", path=None, subdir=None, quiet=True
+                )
+            )
+            cmd_vault.run_sync(self._sync_args())
+            cmd_vault.run_sync(self._sync_args())
+        with index.connect(self.db) as conn:
+            notes = index.get_notes(conn, rid)
+        self.assertEqual(len(notes), 1)
 
     def test_missing_vault_path_errors(self):
         # Override the config patch for this one test

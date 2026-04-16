@@ -456,6 +456,39 @@ _ALLOWED_SYNC_STATUSES: frozenset[str] = frozenset(
     {"new", "reviewed", "in-use", "dropped", "flagged"}
 )
 
+# ---------- note body parser ----------
+
+_NOTE_BULLET_RE = re.compile(
+    r"^-\s+\*\*(.+?)\*\*\s*[-:]\s*(.+)$"
+)
+
+
+def parse_notes_from_body(body: str) -> list[dict[str, str]]:
+    """Extract notes from the markdown body's ## Notes section.
+
+    Only bullets matching the exact pattern our writer emits are
+    recognised: `- **<timestamp>** - <body>`. Everything else is
+    silently ignored (it might be a user-added heading, freeform
+    text, etc. - those are not gitpulse-managed notes).
+    """
+    in_notes_section = False
+    notes: list[dict[str, str]] = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## Notes"):
+            in_notes_section = True
+            continue
+        if in_notes_section and stripped.startswith("## "):
+            break  # next section started
+        if in_notes_section:
+            m = _NOTE_BULLET_RE.match(stripped)
+            if m:
+                notes.append({
+                    "created_at": m.group(1).strip(),
+                    "body": m.group(2).strip(),
+                })
+    return notes
+
 
 def sync_vault(
     target: VaultTarget,
@@ -488,6 +521,7 @@ def sync_vault(
         "edits_applied": 0,
         "status_changed": 0,
         "tags_changed": 0,
+        "notes_added": 0,
         "orphans": [],
         "parse_errors": [],
         "files_rewritten": 0,
@@ -507,7 +541,7 @@ def sync_vault(
             continue
 
         try:
-            front, _body = parse_frontmatter(text)
+            front, body = parse_frontmatter(text)
         except FrontmatterError as e:
             stats["parse_errors"].append({"path": md_path, "error": str(e)})
             continue
@@ -532,10 +566,14 @@ def sync_vault(
         if isinstance(raw_tags, list):
             new_tags = [str(t).lower() for t in raw_tags if str(t).strip()]
 
+        # Parse notes from the body section
+        vault_notes = parse_notes_from_body(body)
+
         applied = writer.apply_edits(
             repo_id=repo_id,
             status=new_status if isinstance(new_status, str) else None,
             tags=new_tags,
+            new_notes=vault_notes,
         )
         if applied is None:
             stats["orphans"].append(md_path)
@@ -548,7 +586,9 @@ def sync_vault(
             stats["status_changed"] += 1
         if applied.get("tags_changed"):
             stats["tags_changed"] += 1
-        if applied.get("status_changed") or applied.get("tags_changed"):
+        notes_added = applied.get("notes_added", 0)
+        stats["notes_added"] += notes_added
+        if applied.get("status_changed") or applied.get("tags_changed") or notes_added:
             stats["edits_applied"] += 1
 
     # Phase 2 of sync: regenerate every .md from the now-reconciled DB.

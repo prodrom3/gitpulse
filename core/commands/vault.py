@@ -124,8 +124,8 @@ class _IndexSyncWriter:
     """Adapter that applies vault-side edits to the live index.
 
     apply_edits() is called once per vault file with (repo_id, status,
-    tags). Returns a dict describing what changed, or a dict with
-    repo_missing=True when the id no longer exists in the DB.
+    tags, new_notes). Returns a dict describing what changed, or a dict
+    with repo_missing=True when the id no longer exists in the DB.
     """
 
     def __init__(self, conn: Any) -> None:
@@ -137,6 +137,7 @@ class _IndexSyncWriter:
         repo_id: int,
         status: str | None,
         tags: list[str] | None,
+        new_notes: list[dict[str, str]] | None = None,
     ) -> dict[str, Any] | None:
         repo = _index.get_repo(self.conn, repo_id)
         if repo is None:
@@ -146,6 +147,7 @@ class _IndexSyncWriter:
             "repo_missing": False,
             "status_changed": False,
             "tags_changed": False,
+            "notes_added": 0,
         }
 
         if status is not None and status != repo["status"]:
@@ -163,6 +165,17 @@ class _IndexSyncWriter:
                 if to_remove:
                     _index.remove_tags(self.conn, repo_id, to_remove)
                 result["tags_changed"] = True
+
+        if new_notes:
+            existing_bodies = {
+                n["body"] for n in (repo.get("notes") or [])
+            }
+            for note in new_notes:
+                body = note.get("body", "").strip()
+                if body and body not in existing_bodies:
+                    _index.add_note(self.conn, repo_id, body)
+                    existing_bodies.add(body)
+                    result["notes_added"] += 1
 
         return result
 
@@ -200,7 +213,8 @@ def run_sync(args: argparse.Namespace) -> int:
         print(
             f"vault sync: {stats['files_scanned']} file(s) scanned, "
             f"{stats['edits_applied']} edit(s) applied "
-            f"({stats['status_changed']} status, {stats['tags_changed']} tags), "
+            f"({stats['status_changed']} status, {stats['tags_changed']} tags, "
+            f"{stats['notes_added']} notes), "
             f"{stats['files_rewritten']} file(s) rewritten"
         )
         if stats["orphans"]:
