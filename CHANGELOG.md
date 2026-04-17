@@ -11,6 +11,21 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.3.0] - 2026-04-17
+
+### Changed
+
+- **Logs now live under `$XDG_DATA_HOME/nostos/logs/`** (default `~/.local/share/nostos/logs/` on Linux / macOS, `%LOCALAPPDATA%\nostos\logs\` on Windows) instead of `./logs/` relative to the install root. This fixes the pipx gotcha where log files were silently buried inside the pipx venv (`~/.local/pipx/venvs/nostos/lib/.../logs`) and lost on every `pipx reinstall`. The new location sits alongside the metadata index, is created with `0700` perms on Unix, and survives reinstalls.
+- `nostos update` now suggests `pip install --upgrade nostos` (PyPI) as the upgrade command for pip-installed users instead of `pip install --upgrade git+https://github.com/prodrom3/nostos.git`. The git URL remains in the notes for operators who prefer tracking git HEAD.
+
+### Documentation
+
+- README: env-vars table expanded with `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and the Windows `APPDATA` / `LOCALAPPDATA` fallbacks.
+- README: Logging section rewritten to reflect the new log location.
+- Repository restructure: long-form reference content moved into `docs/` (architecture, upstream probes, bundle schema, vault); README condensed from ~1180 to ~360 lines.
+- New enterprise-oriented root files: `CHANGELOG.md`, `CONTRIBUTING.md`, `MAINTAINERS.md`.
+- README header: replaced the (now-dead) `prodrom3/gitpulse/assets/...` image with an inline ASCII banner.
+
 ## [1.2.0] - 2026-04-17
 
 ### Added
@@ -76,7 +91,8 @@ No unreleased changes.
 - Breaking changes: CLI command, PyPI package, config file (`~/.gitpulserc` -> `~/.nostosrc`), watchlist (`~/.gitpulse_repos` -> `~/.nostos_repos`), data dir, self-update endpoint.
 - Migration path for existing gitpulse users: `gitpulse export --out fleet.json` on the old install, then `pipx install nostos && nostos import fleet.json` on the new install.
 
-[Unreleased]: https://github.com/prodrom3/nostos/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/prodrom3/nostos/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/prodrom3/nostos/releases/tag/v1.3.0
 [1.2.0]: https://github.com/prodrom3/nostos/releases/tag/v1.2.0
 [1.1.0]: https://github.com/prodrom3/nostos/releases/tag/v1.1.0
 [1.0.0]: https://github.com/prodrom3/nostos/releases/tag/v1.0.0

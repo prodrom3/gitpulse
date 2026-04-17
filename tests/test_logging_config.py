@@ -77,10 +77,17 @@ class TestLogsDirectory(unittest.TestCase):
         logs_dir = _get_logs_directory()
         self.assertTrue(os.path.isabs(logs_dir))
 
-    def test_logs_dir_under_script_root(self):
+    def test_logs_dir_lives_under_data_dir(self):
+        from core.paths import data_dir as _data_dir
+
         logs_dir = _get_logs_directory()
-        script_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.assertTrue(logs_dir.startswith(script_root))
+        self.assertEqual(
+            os.path.realpath(logs_dir),
+            os.path.realpath(os.path.join(_data_dir(), "logs")),
+        )
+
+    def test_logs_dir_basename_is_logs(self):
+        self.assertEqual(os.path.basename(_get_logs_directory()), "logs")
 
 
 class TestSetupLoggingSymlinkProtection(unittest.TestCase):

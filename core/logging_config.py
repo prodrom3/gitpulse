@@ -3,15 +3,24 @@ import glob
 import logging
 import os
 import stat
+import sys
 
 from .config import DEFAULT_MAX_LOG_FILES
-
-_SCRIPT_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from .paths import data_dir, ensure_data_dir
 
 
 def _get_logs_directory() -> str:
-    """Return the logs directory path, anchored to the script's location."""
-    return os.path.join(_SCRIPT_DIR, "logs")
+    """Return the logs directory path under the XDG data dir.
+
+    Logs live alongside the metadata index so a pipx install doesn't
+    bury them inside the venv: the operator always finds them at a
+    predictable, cross-OS location.
+
+    Linux:   $XDG_DATA_HOME/nostos/logs          (default ~/.local/share/nostos/logs)
+    macOS:   $XDG_DATA_HOME/nostos/logs          (same XDG conventions)
+    Windows: $LOCALAPPDATA/nostos/logs           (paths.data_dir falls back here)
+    """
+    return os.path.join(data_dir(), "logs")
 
 
 def rotate_logs(logs_directory: str, max_files: int = DEFAULT_MAX_LOG_FILES) -> None:
@@ -35,8 +44,16 @@ def setup_logging(max_log_files: int = DEFAULT_MAX_LOG_FILES) -> None:
         raise SystemExit(
             f"Refusing to write logs: '{logs_directory}' is a symlink to '{resolved}'"
         )
+    # Ensure the parent (data dir) exists with 0700 perms, then the logs
+    # subdir itself. Re-creating the data dir is cheap and idempotent.
+    ensure_data_dir()
     if not os.path.exists(logs_directory):
         os.makedirs(logs_directory)
+        if sys.platform != "win32":
+            try:
+                os.chmod(logs_directory, 0o700)
+            except OSError:
+                pass
 
     rotate_logs(logs_directory, max_log_files)
 

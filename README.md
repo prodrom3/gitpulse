@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/nostos/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/nostos/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-1.3.0-orange.svg)](./VERSION)
 [![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
@@ -186,6 +186,9 @@ patterns = archived-*, .backup-*, vendor-*
 | `NO_COLOR` | Disables ANSI color when set to any non-empty value. |
 | `NOSTOS_SHELL` | Overrides `$SHELL` when detecting the target shell for `nostos completion`. Accepts `bash` / `zsh` / `fish`. |
 | `GITHUB_TOKEN`, etc. | Referenced via `token_env = "..."` in `~/.config/nostos/auth.toml` for upstream probes. |
+| `XDG_CONFIG_HOME` | Relocates `~/.config/nostos/` (default `~/.config`). |
+| `XDG_DATA_HOME` | Relocates `~/.local/share/nostos/` - the index DB **and** the `logs/` subdirectory (default `~/.local/share`). |
+| `APPDATA` / `LOCALAPPDATA` | Windows fallbacks when the XDG variables are unset: config lives under `%APPDATA%\nostos\`, data under `%LOCALAPPDATA%\nostos\`. |
 
 Precedence, highest to lowest: **CLI flags** -> **`~/.nostosrc`** -> **built-in defaults**.
 
@@ -274,7 +277,7 @@ Skipped repositories (dirty, detached, no upstream) do **not** fail the run - th
 
 ## Logging
 
-Each run writes a timestamped log file to `./logs/` (relative to the install root), e.g. `2026-04-17_14-30-00.log`. Rotated to the most recent 20 (configurable via `max_log_files`). Files are `0600`. HTTPS credentials of the form `https://user:token@host/` are sanitized to `https://***@host/` before being written.
+Each run writes a timestamped log file to `$XDG_DATA_HOME/nostos/logs/` (default `~/.local/share/nostos/logs/` on Linux / macOS, `%LOCALAPPDATA%\nostos\logs\` on Windows) alongside the metadata index - so logs survive `pipx reinstall` and are always findable regardless of install method. Example filename: `2026-04-17_14-30-00.log`. Rotated to the most recent 20 (configurable via `max_log_files`). Files are `0600`; the `logs/` directory is `0700` on Unix. HTTPS credentials of the form `https://user:token@host/` are sanitized to `https://***@host/` before being written.
 
 ---
 
