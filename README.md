@@ -27,14 +27,15 @@ nostos is three tools in one:
 
 1. A **batch-pull engine** that walks a directory tree (and/or a curated index), discovers every git repository it can reach, and updates them concurrently. Dirty trees, detached HEADs, and missing upstreams are reported and skipped, never overwritten.
 2. A **metadata index** (SQLite) recording identity, provenance, tags, notes, and triage status for every repository in your fleet.
-3. An **upstream probe layer** that queries GitHub, GitLab, and Gitea - hosted and self-hosted - for health signals (archived, stars, last push, latest release, license), with strict fail-closed opsec.
+3. An **upstream probe layer** that queries GitHub, GitLab, and Gitea - hosted and self-hosted - for health signals (archived, stars, last push, latest release, license). Fail-closed by default: only hosts listed in `~/.config/nostos/auth.toml` are ever contacted.
 
 Use cases:
 
-- Platform / DevEx teams keeping shared tool repositories fresh on developer workstations.
-- Build boxes or mirror hosts maintaining read-only clones of upstream projects.
-- Onboarding automation that bootstraps and refreshes a curated set of team repositories.
-- Release engineers reconciling many long-lived checkouts before a coordinated change.
+- **Developers with many cloned repos** that drift. `nostos ~/projects` pulls them all in parallel; dirty trees and detached HEADs are reported, never overwritten.
+- **Curated project collections** - anyone who ingests new repos from blog posts, papers, or colleague pointers. `nostos add <url>` clones and captures provenance in one step; `nostos triage` walks the new intake; `nostos list --tag python --untouched-over 90` answers "what have I stopped using?" in milliseconds.
+- **Upstream health monitoring** for tracked open-source projects. `nostos refresh` caches archived status, last push, and latest release; `nostos list --upstream-archived` surfaces repos whose upstream has been archived or taken down.
+- **Build boxes and mirror hosts** maintaining read-only clones. JSON output and deterministic exit codes make nostos safe to embed in cron and CI.
+- **Cross-machine fleet replication.** `nostos export` / `nostos import` ship your fleet (metadata plus clone-on-import) between machines, with path remapping for cross-OS moves.
 
 ---
 
