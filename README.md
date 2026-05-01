@@ -3,7 +3,7 @@
 [![CI](https://github.com/prodrom3/nostos/actions/workflows/ci.yml/badge.svg)](https://github.com/prodrom3/nostos/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-1.4.0-orange.svg)](./VERSION)
 [![PyPI](https://img.shields.io/pypi/v/nostos.svg)](https://pypi.org/project/nostos/)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#compatibility)
 
