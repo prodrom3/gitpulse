@@ -11,6 +11,12 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.4] - 2026-05-01
+
+### Changed
+
+- README: replaced the manual `version-X.Y.Z-orange` badge with an auto-updating `github/v/release` badge. Two complementary auto-updating signals remain (`Release` from GitHub releases, `PyPI` from the package index). Net result: zero manual maintenance per release, and during a publish-lag window the divergence between the two badges is visible to operators rather than masked.
+
 ## [1.4.3] - 2026-05-01
 
 ### Changed
