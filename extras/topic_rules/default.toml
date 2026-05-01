@@ -1,0 +1,103 @@
+# nostos topic curation rules - default set
+#
+# Curated baseline that denoises the most common GitHub topic sprawl
+# encountered when --auto-tags imports topics from offensive- and
+# defensive-security repos. Conservative on purpose: no language /
+# distro tags are dropped, and only obvious junk is denied. The
+# alias map collapses the most common synonym fragmentation so that
+# `nostos list --tag pentest` etc. resolve against one canonical
+# form regardless of how a given upstream maintainer chose to spell
+# it.
+#
+# Apply with:
+#   nostos topics import extras/topic_rules/default.toml
+#       (default --merge: unions with your existing rules)
+#
+#   nostos topics import extras/topic_rules/default.toml --replace
+#       (overwrites your local rules entirely)
+#
+# Tweak after import via `nostos topics deny / allow / alias / unalias`.
+# This file is a starting point, not a mandate.
+
+deny = [
+  # Event markers with no fleet-management value:
+  "hacktoberfest",
+  # Placeholder topics that occasionally leak from upstreams:
+  "foo",
+]
+
+[alias]
+# --- Penetration testing ---
+"penetration-testing"            = "pentest"
+"penetration-testing-tools"      = "pentest"
+"pentesting"                     = "pentest"
+"pentesting-tools"               = "pentest"
+"pentest-tool"                   = "pentest"
+"pentest-tools"                  = "pentest"
+
+# --- Red-teaming ---
+"red-teaming"                    = "redteam"
+"red-team"                       = "redteam"
+"red-teaming-tools"              = "redteam"
+"redteam-tools"                  = "redteam"
+"readteaming"                    = "redteam"
+
+# --- Hacking ---
+"hacking-tool"                   = "hacking"
+"hacking-tools"                  = "hacking"
+
+# --- Payloads ---
+"payloads"                       = "payload"
+"payload-generator"              = "payload"
+"payload-generators"             = "payload"
+
+# --- Recon / OSINT noise ---
+"dork"                           = "dorking"
+"dorks"                          = "dorking"
+"google-dorks"                   = "dorking"
+"information-gathering"          = "recon"
+"reconnaissance"                 = "recon"
+"osint-tool"                     = "osint"
+"osint-tools"                    = "osint"
+
+# --- Bug bounty ---
+"bounty"                         = "bugbounty"
+"bug-bounty"                     = "bugbounty"
+"bug-hunting"                    = "bugbounty"
+
+# --- Offensive security branding ---
+"offsec"                         = "offensive-security"
+"osep-prep"                      = "osep"
+
+# --- Reverse-shells / shells ---
+"reverse-shells"                 = "reverse-shell"
+"shell-script"                   = "shell"
+
+# --- Vulnerability sprawl (collapse the family to one umbrella) ---
+"vulnerability-management"       = "vulnerability"
+"vulnerability-detection"        = "vulnerability"
+"vulnerability-assessment"       = "vulnerability"
+"vulnerability-scanners"         = "vulnerability"
+"vulnerability-scanner"          = "vulnerability"
+
+# --- Typos seen in the wild ---
+"sheatsheet"                     = "cheatsheet"
+"cybersecurty"                   = "cybersecurity"
+"cyber-security"                 = "cybersecurity"
+
+# --- Language variants (light touch) ---
+"python3"                        = "python"
+"py3"                            = "python"
+"py"                             = "python"
+
+# --- Distro variants (light touch) ---
+"kali-linux"                     = "kali"
+"termux-hacking"                 = "termux"
+"termux-tool"                    = "termux"
+"termux-tools"                   = "termux"
+
+# --- Misc collapses ---
+"penetration-tester"             = "pentester"
+"web-security"                   = "websec"
+"web-application-security"       = "websec"
+"network-security"               = "netsec"

@@ -173,6 +173,9 @@ nostos topics import team-rules.toml             # default: merge with local rul
 nostos topics import team-rules.toml --replace   # overwrite local rules
 curl -sS https://example.com/rules.toml | nostos topics import -   # via stdin
 
+# Quick start: import the curated default rule set bundled with nostos
+nostos topics import extras/topic_rules/default.toml
+
 # Find C2 tools you haven't touched in 90 days
 nostos list --tag c2 --untouched-over 90
 
