@@ -24,6 +24,10 @@ deny = [
   "hacktoberfest",
   # Placeholder topics that occasionally leak from upstreams:
   "foo",
+  # Repo-name echoes (a maintainer tagged the repo with its own name) seen
+  # in real fleets. Add more with `nostos topics deny <name>` as you spot them.
+  "paybag",
+  "lazyscript",
 ]
 
 [alias]
@@ -129,3 +133,79 @@ deny = [
 "web-security"                   = "websec"
 "web-application-security"       = "websec"
 "network-security"               = "netsec"
+
+# --- Pentest variants (added in 1.4.5) ---
+"penetration-test"               = "pentest"
+"pentesting-guides"              = "pentest"
+"linux-pentesting"               = "pentest"
+
+# --- Hacking variants (added in 1.4.5) ---
+"web-hacking"                    = "hacking"
+"ethical-hacking"                = "hacking"
+"ethical-hacking-tools"          = "hacking"
+
+# --- Security umbrella (added in 1.4.5).
+#     Existing convention: cybersecurity is canonical (cyber-security and
+#     cybersecurty already alias to it). Adding `security -> cybersecurity`
+#     completes the family - 'security' alone is too broad to filter on. ---
+"security"                       = "cybersecurity"
+
+# --- Port scan variants (added in 1.4.5) ---
+"port-scanner"                   = "port-scan"
+"portscanner"                    = "port-scan"
+"port-enumeration"               = "port-scan"
+"scan-ports"                     = "port-scan"
+
+# --- XSS flavor variants (added in 1.4.5) ---
+"xss-scanner"                    = "xss"
+"xss-detection"                  = "xss"
+"xss-exploit"                    = "xss"
+"xss-python"                     = "xss"
+"xss-bruteforce"                 = "xss"
+"xsstrike"                       = "xss"
+
+# --- WAF variants (added in 1.4.5) ---
+"waffit"                         = "waf"
+"web-application-firewall"       = "waf"
+"waf-detection"                  = "waf"
+
+# --- CORS variants (added in 1.4.5) ---
+"cors-misconfiguration-scanner"  = "cors"
+"cors-misconfigurations"         = "cors"
+"cors-policy"                    = "cors"
+"cors-scanner"                   = "cors"
+
+# --- CSRF variants (added in 1.4.5) ---
+"csrf-scanner"                   = "csrf"
+"xsrf"                           = "csrf"
+
+# --- Subdomain takeover variants (added in 1.4.5) ---
+"subdomain-takeovers"            = "subdomain-takeover"
+"takeover-subdomain"             = "subdomain-takeover"
+"hostile-subdomain-takeover"     = "subdomain-takeover"
+
+# --- Virtual host variants (added in 1.4.5) ---
+"vhosts"                         = "vhost"
+"virtual-host"                   = "vhost"
+"virtual-hosts"                  = "vhost"
+
+# --- DNS variants (added in 1.4.5) ---
+"dns-bruteforcer"                = "dns"
+"dns-resolution"                 = "dns"
+"dns-resolver"                   = "dns"
+"subdomain-bruteforcing"         = "subdomain"
+
+# --- Vulnerability variants (added in 1.4.5) ---
+"vulnerabilities"                = "vulnerability"
+"security-vulnerability"         = "vulnerability"
+
+# --- MITRE ATT&CK family (added in 1.4.5) ---
+"mitre-attack"                   = "mitre"
+"mitre-corporation"              = "mitre"
+
+# --- Singletons collapsing to existing canonical forms (added in 1.4.5) ---
+"wordlists"                      = "wordlist"
+"server-side-request-forgery"    = "ssrf"
+"open-redirections"              = "open-redirect"
+"secrets-management"             = "secret-management"
+"subdomains"                     = "subdomain"

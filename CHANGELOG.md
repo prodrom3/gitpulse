@@ -11,6 +11,33 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.5] - 2026-05-01
+
+### Changed
+
+- `extras/topic_rules/default.toml`: 45 additional alias entries and 2 additional deny entries driven by long-tail sprawl observed on a real ~60-repo offensive-security fleet. Total now 4 deny + 109 alias (was 2 + 64). All additions are appended (no existing entries removed or retargeted).
+
+  New family collapses (existing entries unchanged):
+  - **Pentest**: `penetration-test`, `pentesting-guides`, `linux-pentesting` -> `pentest`.
+  - **Hacking**: `web-hacking`, `ethical-hacking`, `ethical-hacking-tools` -> `hacking`.
+  - **Security umbrella**: `security` -> `cybersecurity`. Completes the family (`cyber-security` and `cybersecurty` already aliased to `cybersecurity`); plain `security` was too broad to filter on usefully.
+  - **Port scan**: `port-scanner`, `portscanner`, `port-enumeration`, `scan-ports` -> `port-scan`.
+  - **XSS flavor variants**: `xss-scanner`, `xss-detection`, `xss-exploit`, `xss-python`, `xss-bruteforce`, `xsstrike` -> `xss`.
+  - **WAF**: `waffit`, `web-application-firewall`, `waf-detection` -> `waf`.
+  - **CORS**: `cors-misconfiguration-scanner`, `cors-misconfigurations`, `cors-policy`, `cors-scanner` -> `cors`.
+  - **CSRF**: `csrf-scanner`, `xsrf` -> `csrf`.
+  - **Subdomain takeover**: `subdomain-takeovers`, `takeover-subdomain`, `hostile-subdomain-takeover` -> `subdomain-takeover`.
+  - **Virtual host**: `vhosts`, `virtual-host`, `virtual-hosts` -> `vhost`.
+  - **DNS**: `dns-bruteforcer`, `dns-resolution`, `dns-resolver` -> `dns`; `subdomain-bruteforcing` -> `subdomain`.
+  - **Vulnerability**: `vulnerabilities`, `security-vulnerability` -> `vulnerability`.
+  - **MITRE**: `mitre-attack`, `mitre-corporation` -> `mitre`.
+  - **Singletons -> existing canonical**: `wordlists` -> `wordlist`, `server-side-request-forgery` -> `ssrf`, `open-redirections` -> `open-redirect`, `secrets-management` -> `secret-management`, `subdomains` -> `subdomain`.
+
+  New deny entries:
+  - `paybag`, `lazyscript` - repo-name echoes (a maintainer tagged the repo with its own name) seen on real fleets, no fleet-management value.
+
+Operators on 1.4.0 / 1.4.1 / 1.4.2 / 1.4.3 / 1.4.4 should re-import (default `--merge` overlays incoming-wins) and run `nostos topics apply` to retroactively re-canonicalise the index.
+
 ## [1.4.4] - 2026-05-01
 
 ### Changed
