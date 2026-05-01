@@ -11,6 +11,26 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.0] - 2026-05-01
+
+### Added
+
+- **`nostos add --auto-tags`** and **`nostos refresh --auto-tags`** opt-in flags. After cloning (or during refresh), the upstream host's API is queried for the repo's "topics" field and the values are merged into the local tag list. Works against GitHub, GitLab, and Gitea (hosted and self-hosted). Opsec gates from `~/.config/nostos/auth.toml` apply: hosts not configured are silently skipped. Repos marked `--quiet-upstream` always bypass the probe.
+- `[add] auto_tags = true | false` knob in `~/.nostosrc` to set the default for `nostos add` per machine. CLI flag overrides the config value.
+- **`nostos topics`** subcommand to manage topic curation rules with eight sub-verbs: `list`, `deny`, `allow`, `alias`, `unalias`, `export`, `import`, `apply`. Rules persist in `$XDG_CONFIG_HOME/nostos/topic_rules.toml` (atomic write, `0600` on Unix). The deny list drops junk topics entirely; the alias map collapses synonym sprawl (e.g. `penetration-testing` -> `pentest`, `red-teaming` -> `redteam`) so `nostos list --tag pentest` resolves regardless of how an upstream maintainer spelled the topic.
+- `topics export [PATH]` writes the current rules as TOML to PATH or stdout. `topics import FILE` loads a rules document with `--merge` (default; unions deny lists and overlays alias maps) or `--replace` (overwrites local rules). Both accept `-` for stdin, so `curl ... | nostos topics import -` and `nostos topics export | ssh other-host nostos topics import -` work.
+- `topics apply` retroactively curates tag state on already-indexed repos so importing rules (or editing them via `deny` / `alias`) fixes the index, not just future imports. `--repo PATH_OR_ID` targets one repo; `--dry-run` previews changes without writing; `--json` emits a machine-readable summary. Idempotent.
+- `extras/topic_rules/default.toml`: bundled curated rule set (2 deny + 49 aliases) that anyone can import as a starting point. Conservative: only obvious junk is denied, no language or distro topics are dropped.
+- New module `core/topic_rules.py` exposes `TopicRules`, `load_rules`, `save_rules`, `parse_rules_from_text`, `dump_rules`, `merge_rules`. Hand-rolled TOML serializer keeps the zero-runtime-dep invariant.
+- `topics` field added to `GitHubProbe`, `GitLabProbe`, and `GiteaProbe` results (no extra HTTP request: the field is already in the providers' main repo response).
+- 43 new tests covering rules apply / save / load / round-trip, `topics` CLI verbs end-to-end (including stdin import and JSON summary shape), `add --auto-tags` / `refresh --auto-tags` flow with rules applied, and `apply` retroactive cleanup. Suite total: 522 (up from 479).
+
+### Changed
+
+- **`nostos tag`** now accepts `~tag` as a remove prefix in addition to `-tag`. argparse parses bare `-tag` as an unknown option flag, so the hyphen form previously required the `--` end-of-options separator (`nostos tag <repo> -- -old +new`). The new tilde form sidesteps the gotcha entirely (`nostos tag <repo> ~old +new`). The hyphen form still works after `--` for back-compat.
+- README updated with new examples for `--auto-tags`, `nostos topics`, `topics import / export`, `topics apply`, and the bundled default rule set. Verb table gains a `topics` row.
+- Bash and zsh completions extended for the new flags and sub-verbs.
+
 ## [1.3.0] - 2026-04-17
 
 ### Changed
