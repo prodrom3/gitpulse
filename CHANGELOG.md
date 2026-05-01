@@ -11,6 +11,16 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.3] - 2026-05-01
+
+### Changed
+
+- `extras/topic_rules/default.toml`: three retargeted aliases driven by operator feedback.
+  - **Offsec branding**: canonical form switched from `offensive-security` to the shorter, more idiomatic `offsec`. `offensive-security` and `offensivesecurity` now both alias to `offsec` (the previous `offsec -> offensive-security` mapping was the reverse direction).
+  - **Web pentest**: `web-penetration-testing` now collapses to `websec` instead of `pentest`. Web pentest is more naturally a subset of web-security work than of general pentest tooling, and this leaves `pentest` for the broader pentest-tool category.
+
+Operators who already imported the 1.4.2 default set should re-import (`nostos topics import extras/topic_rules/default.toml`, default `--merge` will overlay the new directions on top of the old ones since alias-overlay is "incoming wins") and then re-curate (`nostos topics apply`).
+
 ## [1.4.2] - 2026-05-01
 
 ### Changed

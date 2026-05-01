@@ -65,8 +65,8 @@ deny = [
 "bug-bounty"                     = "bugbounty"
 "bug-hunting"                    = "bugbounty"
 
-# --- Offensive security branding ---
-"offsec"                         = "offensive-security"
+# --- Offensive security branding (canonical: offsec - shorter, idiomatic) ---
+"offensive-security"             = "offsec"
 "osep-prep"                      = "osep"
 
 # --- Reverse-shells / shells ---
@@ -101,7 +101,7 @@ deny = [
 "brute-force-attacks"            = "bruteforce"
 
 # --- Web testing ---
-"web-penetration-testing"        = "pentest"
+"web-penetration-testing"        = "websec"
 "web-application"                = "websec"
 
 # --- Linux noise ---
@@ -111,7 +111,7 @@ deny = [
 "sheatsheet"                     = "cheatsheet"
 "cybersecurty"                   = "cybersecurity"
 "cyber-security"                 = "cybersecurity"
-"offensivesecurity"              = "offensive-security"
+"offensivesecurity"              = "offsec"
 
 # --- Language variants (light touch) ---
 "python3"                        = "python"
