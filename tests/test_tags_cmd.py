@@ -38,7 +38,12 @@ class _TagsTestCase(unittest.TestCase):
                 _index.add_repo(conn, path, tags=list(tags))
 
     def _args(self, **overrides):
-        base = {"include_orphans": False, "prune_orphans": False, "json": False}
+        base = {
+            "include_orphans": False,
+            "prune_orphans": False,
+            "grouping": None,
+            "json": False,
+        }
         base.update(overrides)
         return argparse.Namespace(**base)
 
@@ -112,6 +117,80 @@ class TestTagsCommand(_TagsTestCase):
         self.assertEqual(data["orphans_pruned"], 0)
         names = {entry["name"]: entry["repos"] for entry in data["tags"]}
         self.assertEqual(names, {"c2": 2, "redteam": 1})
+
+    def test_grouped_output_has_bucket_headers(self):
+        self._seed({
+            "/t/a": ["recon", "pentest"],          # discipline
+            "/t/b": ["xss", "csrf"],               # attack-class
+            "/t/c": ["python", "golang"],          # language
+            "/t/d": ["nord-theme-totally-made-up"],  # other
+        })
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="grouped"))
+        text = out.getvalue()
+        self.assertIn("[discipline]", text)
+        self.assertIn("[attack-class]", text)
+        self.assertIn("[language]", text)
+        self.assertIn("[other]", text)
+        # Bucket order: discipline appears before language appears before other.
+        self.assertLess(text.index("[discipline]"), text.index("[language]"))
+        self.assertLess(text.index("[language]"), text.index("[other]"))
+
+    def test_flat_output_has_no_bucket_headers(self):
+        self._seed({"/t/a": ["recon", "xss", "python"]})
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="flat"))
+        text = out.getvalue()
+        self.assertNotIn("[discipline]", text)
+        self.assertNotIn("[attack-class]", text)
+        # All three tags still appear:
+        for tag in ("recon", "xss", "python"):
+            self.assertIn(tag, text)
+
+    def test_grouped_skips_empty_buckets(self):
+        # A fleet with only language tags should produce only the
+        # `[language]` section, no others.
+        self._seed({"/t/a": ["python", "golang"]})
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="grouped"))
+        text = out.getvalue()
+        self.assertIn("[language]", text)
+        self.assertNotIn("[discipline]", text)
+        self.assertNotIn("[attack-class]", text)
+        self.assertNotIn("[other]", text)
+
+    def test_default_grouping_follows_isatty(self):
+        self._seed({"/t/a": ["recon"]})
+        # Force isatty=True -> grouped:
+        with mock.patch("sys.stdout") as fake_stdout:
+            fake_stdout.isatty.return_value = True
+            buf = io.StringIO()
+            fake_stdout.write = buf.write
+            with mock.patch("sys.stderr", new_callable=io.StringIO):
+                cmd_tags.run(self._args())
+        self.assertIn("[discipline]", buf.getvalue())
+
+        # Force isatty=False -> flat:
+        with mock.patch("sys.stdout") as fake_stdout:
+            fake_stdout.isatty.return_value = False
+            buf = io.StringIO()
+            fake_stdout.write = buf.write
+            with mock.patch("sys.stderr", new_callable=io.StringIO):
+                cmd_tags.run(self._args())
+        self.assertNotIn("[discipline]", buf.getvalue())
+
+    def test_json_includes_bucket_field(self):
+        self._seed({"/t/a": ["xss", "python"]})
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(json=True))
+        data = json.loads(out.getvalue())
+        by_name = {entry["name"]: entry for entry in data["tags"]}
+        self.assertEqual(by_name["xss"]["bucket"], "attack-class")
+        self.assertEqual(by_name["python"]["bucket"], "language")
 
     def test_prune_flag_actually_prunes(self):
         self._seed({"/t/a": ["keep", "drop"]})

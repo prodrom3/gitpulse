@@ -43,7 +43,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "-h --help" -- "$cur"))
             ;;
         tags)
-            COMPREPLY=($(compgen -W "--include-orphans --prune-orphans --json -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--include-orphans --prune-orphans --grouped --flat --json -h --help" -- "$cur"))
             ;;
         note)
             COMPREPLY=($(compgen -W "-h --help" -- "$cur"))

@@ -91,6 +91,8 @@ _nostos() {
                     _arguments \
                         '--include-orphans[Also list tags with zero attached repos]' \
                         '--prune-orphans[Delete orphan tag rows]' \
+                        '--grouped[Force grouped output (default on TTY)]' \
+                        '--flat[Force flat output, even on a TTY]' \
                         '--json[JSON output]'
                     ;;
                 note)

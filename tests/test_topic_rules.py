@@ -158,6 +158,35 @@ class TestMergeRules(unittest.TestCase):
         self.assertEqual(a.deny, {"foo"})
         self.assertEqual(b.deny, {"bar"})
 
+    def test_drops_inverse_alias_from_base(self):
+        # Real-world scenario: 1.4.2 had `offsec -> offensive-security`,
+        # 1.4.3 reversed it to `offensive-security -> offsec`. After a
+        # `--merge` import, both directions would coexist and apply()
+        # would oscillate every run. The merge step must drop the
+        # stale base entry.
+        base = TopicRules(alias={"offsec": "offensive-security"})
+        incoming = TopicRules(alias={"offensive-security": "offsec"})
+        merged = merge_rules(base, incoming)
+        self.assertEqual(merged.alias, {"offensive-security": "offsec"})
+        self.assertNotIn("offsec", merged.alias)
+
+    def test_keeps_unrelated_base_alias_when_target_unchanged(self):
+        # If incoming touches A but base has independent B -> C, the
+        # B -> C entry must survive intact.
+        base = TopicRules(alias={"keep": "this", "src": "old-target"})
+        incoming = TopicRules(alias={"src": "new-target"})
+        merged = merge_rules(base, incoming)
+        self.assertEqual(merged.alias, {"keep": "this", "src": "new-target"})
+
+    def test_does_not_drop_when_targets_differ(self):
+        # Base: A -> B. Incoming: A -> C. (Same source, different target -
+        # not an inversion, just a retarget. Incoming wins; base's other
+        # entries should remain.)
+        base = TopicRules(alias={"a": "b", "x": "y"})
+        incoming = TopicRules(alias={"a": "c"})
+        merged = merge_rules(base, incoming)
+        self.assertEqual(merged.alias, {"a": "c", "x": "y"})
+
 
 if __name__ == "__main__":
     unittest.main()

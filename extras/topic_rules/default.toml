@@ -28,6 +28,15 @@ deny = [
   # in real fleets. Add more with `nostos topics deny <name>` as you spot them.
   "paybag",
   "lazyscript",
+  # Generic words too broad to filter on (added 1.4.6):
+  "tool", "list", "lib", "files", "extract", "urls", "endpoints",
+  # UI / extension targets unrelated to the security work the repo does:
+  "build-tool", "gui", "customtkinter", "chrome-extension",
+  "firefox-extension", "chrome-headless", "chromium", "grunt-plugins",
+  # Implementation-detail noise:
+  "multithreading", "asynchronous", "thread", "pipeline", "socket", "pcre",
+  # Operational adjectives without category value:
+  "automated", "realtime", "monitor", "filtering",
 ]
 
 [alias]
@@ -209,3 +218,26 @@ deny = [
 "open-redirections"              = "open-redirect"
 "secrets-management"             = "secret-management"
 "subdomains"                     = "subdomain"
+
+# --- 1.4.6 long-tail collapses ---
+# Subdomain takeover - more variants to fold into the existing canonical
+"takeover"                       = "subdomain-takeover"
+"hostile"                        = "subdomain-takeover"
+
+# Parameter family
+"parameter-finder"               = "parameter"
+"urls-parameters"                = "parameter"
+
+# Secret family - keep `secret` as canonical (singular, matches existing convention)
+"secrets"                        = "secret"
+
+# SBOM family - collapse generator/tool variants to the umbrella term
+"sbom-generator"                 = "sbom"
+"sbom-tool"                      = "sbom"
+
+# Breach family
+"breach-checker"                 = "breach"
+"data-breach"                    = "breach"
+
+# Language typo
+"c-plus-plus"                    = "cpp"

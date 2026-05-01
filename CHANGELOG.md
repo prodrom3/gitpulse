@@ -11,6 +11,20 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.6] - 2026-05-01
+
+### Added
+
+- **`extras/topic_rules/default.toml`**: 10 additional aliases and 25 additional deny entries appended for long-tail sprawl observed in the field.
+  - Aliases: `takeover` and `hostile` -> `subdomain-takeover`; `parameter-finder` and `urls-parameters` -> `parameter`; `secrets` -> `secret`; `sbom-generator` and `sbom-tool` -> `sbom`; `breach-checker` and `data-breach` -> `breach`; `c-plus-plus` -> `cpp`.
+  - New denies: 25 entries split across three groups - generic words too broad to filter on (`tool`, `list`, `lib`, `files`, `extract`, `urls`, `endpoints`), UI / extension targets (`build-tool`, `gui`, `customtkinter`, `chrome-extension`, `firefox-extension`, `chrome-headless`, `chromium`, `grunt-plugins`), implementation-detail noise (`multithreading`, `asynchronous`, `thread`, `pipeline`, `socket`, `pcre`), and operational adjectives without category value (`automated`, `realtime`, `monitor`, `filtering`). Total now 29 deny + 119 alias.
+- **`nostos tags --grouped` / `--flat`**: tag listing now buckets tags by inferred category (`discipline`, `attack-class`, `recon-technique`, `tool-kind`, `secret-leaks`, `project-name`, `language`, `os`, `tech`, `other`) for human-readable output. Defaults to grouped when stdout is a TTY, flat when piped, with explicit flags to override either way. JSON output now includes a `bucket` field on every tag entry. Display-only - no schema, storage, or query semantics change.
+- New module `core/tag_buckets.py` with the bucket lookup table and `bucket_for(tag)` helper. Tags not in the table fall through to `other`.
+
+### Fixed
+
+- `core.topic_rules.merge_rules` now detects and drops inverse-alias collisions when an incoming rules file flips a canonical direction (e.g. 1.4.2 had `offsec -> offensive-security`, 1.4.3 reversed it to `offensive-security -> offsec`). Without this fix a default-merge import on top of a stale local rules file left both directions in the alias map, causing `nostos topics apply` to oscillate between them on every run. Operators stuck in this state can also fix locally with `nostos topics unalias offsec` (or whichever stale source they have).
+
 ## [1.4.5] - 2026-05-01
 
 ### Changed

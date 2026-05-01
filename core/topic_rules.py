@@ -202,8 +202,26 @@ def parse_rules_from_text(text: str) -> TopicRules:
 def merge_rules(base: TopicRules, incoming: TopicRules) -> TopicRules:
     """Return a new TopicRules with deny = base.deny union incoming.deny
     and alias = base.alias overlaid with incoming.alias (incoming wins
-    on conflict)."""
+    on conflict).
+
+    Also detects and drops inverse-alias collisions: when incoming says
+    `A -> B` and base says `B -> A`, the base entry is stale (incoming
+    has reversed the canonical direction). Both directions live in the
+    merged map otherwise, causing apply() to oscillate between them
+    on every run. Triggered when, e.g., a default rule set flips
+    `offsec <-> offensive-security` between releases.
+
+    Only direct inversions (A<->B) are detected. Indirect chain
+    conflicts (A->B->C) are not, but those are far rarer and can be
+    fixed with `nostos topics unalias` if they show up.
+    """
     merged_alias: dict[str, str] = dict(base.alias)
+    for src, dst in incoming.alias.items():
+        # If base says `dst -> src`, that's an inversion of the new
+        # `src -> dst` direction. Drop the stale base entry so apply()
+        # doesn't oscillate.
+        if merged_alias.get(dst) == src:
+            del merged_alias[dst]
     merged_alias.update(incoming.alias)
     return TopicRules(
         deny=sorted(base.deny | incoming.deny),
