@@ -11,6 +11,18 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.1] - 2026-05-01
+
+### Added
+
+- **`nostos tags`** subcommand (plural - distinct from `nostos tag` which edits one repo's tags). Prints every tag currently attached to one or more repos, sorted by attachment count descending then name. Flags: `--include-orphans` also lists tag rows with zero attached repos; `--prune-orphans` deletes them after listing; `--json` for machine-readable output.
+- `core.index.list_tags_with_counts(conn, *, include_orphans=False)` and `core.index.prune_orphan_tags(conn)` helpers. Orphan tags are rows in the `tags` table no longer referenced by any `repo_tags` row, typically left behind after `topics apply` rewrites alias-source tags. They are invisible to `nostos list --tag X` queries (which join through `repo_tags`) and reusable if a future repo gets the same topic, so pruning is purely cosmetic.
+
+### Fixed
+
+- CI: ruff F401 unused-import in `core/topic_rules.py` removed (`config_dir` was imported but never referenced).
+- CI: Python 3.10 test matrix now installs `tomli` so the `parse_rules_from_text` / `dump_rules` test surface exercises the same code paths as 3.11+ (where `tomllib` is stdlib).
+
 ## [1.4.0] - 2026-05-01
 
 ### Added

@@ -470,6 +470,52 @@ def get_tags(conn: sqlite3.Connection, selector: str | int) -> list[str]:
     return _get_tags_for_repo(conn, repo_id)
 
 
+def list_tags_with_counts(
+    conn: sqlite3.Connection, *, include_orphans: bool = False
+) -> list[tuple[str, int]]:
+    """Return (tag_name, attached_repo_count) for every tag in the index.
+
+    Sorted by count desc, then name asc. By default, orphan tags
+    (rows in `tags` no longer referenced by any `repo_tags` row,
+    typically left behind after a `topics apply` or manual `tag -x`)
+    are excluded. Pass include_orphans=True to also list count=0 rows.
+    """
+    rows = conn.execute(
+        """
+        SELECT t.name, COUNT(rt.repo_id) AS n
+        FROM tags t
+        LEFT JOIN repo_tags rt ON rt.tag_id = t.id
+        GROUP BY t.name
+        ORDER BY n DESC, t.name ASC
+        """
+    ).fetchall()
+    out: list[tuple[str, int]] = []
+    for row in rows:
+        n = int(row["n"])
+        if not include_orphans and n == 0:
+            continue
+        out.append((str(row["name"]), n))
+    return out
+
+
+def prune_orphan_tags(conn: sqlite3.Connection) -> int:
+    """Delete rows in `tags` no longer referenced by any `repo_tags`.
+
+    Returns the number of rows removed. Cosmetic - orphan rows are
+    invisible to `nostos list --tag <name>` queries (which join
+    through repo_tags) and reusable if a future repo gets the same
+    tag. Use when you want the tags table itself to stay tidy.
+    """
+    cur = conn.execute(
+        """
+        DELETE FROM tags
+        WHERE id NOT IN (SELECT DISTINCT tag_id FROM repo_tags)
+        """
+    )
+    conn.commit()
+    return int(cur.rowcount or 0)
+
+
 # ---------- notes ----------
 
 

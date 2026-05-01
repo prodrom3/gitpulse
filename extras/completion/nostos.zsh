@@ -12,6 +12,7 @@ verbs=(
     'list:List repositories in the metadata index'
     'show:Show full metadata for a single repository'
     'tag:Add or remove tags on a repository'
+    'tags:List every tag in the index with attachment counts'
     'note:Append a note to a repository'
     'triage:Walk newly-added repositories and classify them'
     'rm:Remove a repository from the metadata index'
@@ -85,6 +86,12 @@ _nostos() {
                     ;;
                 tag)
                     _arguments '1:target:' '*:tags:'
+                    ;;
+                tags)
+                    _arguments \
+                        '--include-orphans[Also list tags with zero attached repos]' \
+                        '--prune-orphans[Delete orphan tag rows]' \
+                        '--json[JSON output]'
                     ;;
                 note)
                     _arguments '1:target:' '2:body:'

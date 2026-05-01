@@ -7,7 +7,7 @@ _nostos() {
     local cur prev words cword
     _init_completion || return
 
-    local verbs="pull add list show tag note triage rm refresh topics digest vault export import update"
+    local verbs="pull add list show tag tags note triage rm refresh topics digest vault export import update"
     local vault_subs="export sync"
     local statuses="new reviewed in-use dropped flagged"
 
@@ -41,6 +41,9 @@ _nostos() {
             ;;
         tag)
             COMPREPLY=($(compgen -W "-h --help" -- "$cur"))
+            ;;
+        tags)
+            COMPREPLY=($(compgen -W "--include-orphans --prune-orphans --json -h --help" -- "$cur"))
             ;;
         note)
             COMPREPLY=($(compgen -W "-h --help" -- "$cur"))
