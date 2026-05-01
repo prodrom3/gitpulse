@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import unittest
 
-from core.tag_buckets import BUCKETS, DISPLAY_ORDER, bucket_for
+from core.tag_buckets import (
+    BUCKETS,
+    DISPLAY_ORDER,
+    SUB_BUCKET_DISPLAY_ORDER,
+    SUB_BUCKETS,
+    bucket_for,
+    sub_bucket_for,
+)
 
 
 class TestBucketFor(unittest.TestCase):
@@ -83,6 +90,96 @@ class TestBucketFor(unittest.TestCase):
             DISPLAY_ORDER[-1],
             "other",
             "'other' must be last in DISPLAY_ORDER",
+        )
+
+
+class TestSubBucketFor(unittest.TestCase):
+    def test_attack_class_web_attacks(self):
+        for tag in ("xss", "csrf", "ssrf", "cors", "command-injection",
+                    "open-redirect", "dom-xss", "crlf-injection"):
+            self.assertEqual(sub_bucket_for(tag, "attack-class"), "web-attacks", tag)
+
+    def test_attack_class_subdomain(self):
+        for tag in ("subdomain-takeover", "takeover", "hostile",
+                    "hostile-subdomain-takeover"):
+            self.assertEqual(sub_bucket_for(tag, "attack-class"), "subdomain", tag)
+
+    def test_attack_class_general_falls_through(self):
+        # Tags in attack-class but not in any specific sub-bucket
+        # land in the 'general' sub-bucket.
+        for tag in ("vulnerability", "exploit", "exploitation", "bypass"):
+            self.assertEqual(sub_bucket_for(tag, "attack-class"), "general", tag)
+
+    def test_attack_class_unknown_falls_to_other(self):
+        self.assertEqual(
+            sub_bucket_for("totally-unknown-attack-tag", "attack-class"), "other"
+        )
+
+    def test_recon_subdomain(self):
+        for tag in ("subdomain", "subdomains", "vertical-corelation",
+                    "horizontal-corelation"):
+            self.assertEqual(sub_bucket_for(tag, "recon-technique"), "subdomain", tag)
+
+    def test_recon_dns(self):
+        for tag in ("dns", "dns-resolver", "massdns"):
+            self.assertEqual(sub_bucket_for(tag, "recon-technique"), "dns", tag)
+
+    def test_recon_web_recon(self):
+        for tag in ("github-recon", "visual-recon", "js-enumeration",
+                    "wayback", "cms"):
+            self.assertEqual(sub_bucket_for(tag, "recon-technique"), "web-recon", tag)
+
+    def test_recon_osint(self):
+        for tag in ("osint", "acquisitions", "asn", "reconnaissance", "recon"):
+            self.assertEqual(sub_bucket_for(tag, "recon-technique"), "osint", tag)
+
+    def test_bucket_without_subbuckets_returns_none(self):
+        # `language`, `os`, `tech`, etc. don't define sub-buckets.
+        self.assertIsNone(sub_bucket_for("python", "language"))
+        self.assertIsNone(sub_bucket_for("linux", "os"))
+        self.assertIsNone(sub_bucket_for("anything", "other"))
+
+    def test_sub_bucket_display_order_covers_real_subs(self):
+        for bucket, sub_table in SUB_BUCKETS.items():
+            ordered = SUB_BUCKET_DISPLAY_ORDER.get(bucket, ())
+            sub_names = {name for name, _ in sub_table}
+            # 'other' is synthetic - allowed to be in display order
+            # but not in the data table.
+            self.assertTrue(
+                sub_names.issubset(set(ordered)),
+                f"{bucket}: SUB_BUCKETS has names not in display order: "
+                f"{sub_names - set(ordered)}",
+            )
+            self.assertEqual(
+                ordered[-1], "other",
+                f"{bucket}: 'other' must be last in SUB_BUCKET_DISPLAY_ORDER",
+            )
+
+
+class TestNewMindmapTags(unittest.TestCase):
+    """Tags pulled from the Pentesting/Bug Bounty Mindmap (Rohit Gautam)
+    that we adopted in 1.5.1."""
+
+    def test_corelation_tags(self):
+        self.assertEqual(bucket_for("vertical-corelation"), "recon-technique")
+        self.assertEqual(bucket_for("horizontal-corelation"), "recon-technique")
+        self.assertEqual(
+            sub_bucket_for("vertical-corelation", "recon-technique"), "subdomain"
+        )
+
+    def test_acquisitions_and_asn(self):
+        self.assertEqual(bucket_for("acquisitions"), "recon-technique")
+        self.assertEqual(bucket_for("asn"), "recon-technique")
+        self.assertEqual(sub_bucket_for("acquisitions", "recon-technique"), "osint")
+
+    def test_web_application_attacks_umbrella(self):
+        self.assertEqual(bucket_for("web-application-attacks"), "discipline")
+
+    def test_certificate_transparency(self):
+        self.assertEqual(bucket_for("certificate-transparency"), "recon-technique")
+        self.assertEqual(
+            sub_bucket_for("certificate-transparency", "recon-technique"),
+            "web-recon",
         )
 
 

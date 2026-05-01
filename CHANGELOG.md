@@ -11,6 +11,26 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.5.1] - 2026-05-01
+
+### Added
+
+- **Sub-bucket grouping** in `nostos tags --grouped`. Buckets that define a multi-axis taxonomy (currently `attack-class` and `recon-technique`) display tags grouped by sub-bucket within the bucket header, matching the natural categorisation in the Pentesting/Bug-Bounty Mindmap (Rohit Gautam):
+  - `attack-class` -> `web-attacks`, `subdomain`, `crypto`, `general`.
+  - `recon-technique` -> `subdomain`, `dns`, `port-network`, `vhost`, `content`, `web-recon`, `osint`.
+
+  Buckets without sub-buckets defined still render flat (unchanged from 1.4.6).
+
+- New `core.tag_buckets.SUB_BUCKETS`, `SUB_BUCKET_DISPLAY_ORDER`, and `sub_bucket_for(tag, bucket)` helper. `nostos tags --json` now includes a `sub_bucket` field on every tag entry (`null` for tags whose bucket has no sub-buckets configured).
+
+- New mindmap-derived tags surfaced and bucketed:
+  - `vertical-corelation`, `horizontal-corelation` -> `recon-technique` / `subdomain` sub-bucket.
+  - `acquisitions`, `asn` -> `recon-technique` / `osint` sub-bucket.
+  - `certificate-transparency` -> `recon-technique` / `web-recon` sub-bucket.
+  - `web-application-attacks` -> `discipline` (umbrella term).
+
+  Operators ingesting tools off the mindmap can now tag with the canonical category names and they'll group correctly.
+
 ## [1.5.0] - 2026-05-01
 
 ### Added

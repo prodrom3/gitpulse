@@ -17,7 +17,13 @@ import sys
 from typing import Any
 
 from .. import index as _index
-from ..tag_buckets import DISPLAY_ORDER, bucket_for
+from ..tag_buckets import (
+    DISPLAY_ORDER,
+    SUB_BUCKET_DISPLAY_ORDER,
+    SUB_BUCKETS,
+    bucket_for,
+    sub_bucket_for,
+)
 from ._common import fail, maybe_migrate_watchlist
 
 
@@ -83,11 +89,17 @@ def run(args: argparse.Namespace) -> int:
 
     if args.json:
         import json as _json
+        tag_entries = []
+        for n, c in entries:
+            b = bucket_for(n)
+            tag_entries.append({
+                "name": n,
+                "repos": c,
+                "bucket": b,
+                "sub_bucket": sub_bucket_for(n, b),
+            })
         print(_json.dumps({
-            "tags": [
-                {"name": n, "repos": c, "bucket": bucket_for(n)}
-                for n, c in entries
-            ],
+            "tags": tag_entries,
             "total_tags": len(entries),
             "orphans_pruned": pruned,
         }, indent=2))
@@ -134,7 +146,9 @@ def _print_flat(entries: list[tuple[str, int]]) -> None:
 
 
 def _print_grouped(entries: list[tuple[str, int]]) -> None:
-    """Print entries grouped by inferred bucket. Empty buckets are skipped."""
+    """Print entries grouped by inferred bucket. Buckets that define
+    sub-buckets are further grouped one level deeper. Empty buckets
+    and empty sub-buckets are skipped."""
     by_bucket: dict[str, list[tuple[str, int]]] = {}
     for name, n in entries:
         by_bucket.setdefault(bucket_for(name), []).append((name, n))
@@ -149,6 +163,41 @@ def _print_grouped(entries: list[tuple[str, int]]) -> None:
             print()
         first = False
         print(f"[{bucket}]")
-        # entries are already globally sorted by count desc, name asc
-        for name, n in items:
-            print(f"  {name:<{width}}  {n}")
+        if bucket in SUB_BUCKETS:
+            _print_sub_grouped(bucket, items, width)
+        else:
+            for name, n in items:
+                print(f"  {name:<{width}}  {n}")
+
+
+def _print_sub_grouped(
+    bucket: str, items: list[tuple[str, int]], width: int
+) -> None:
+    """Print one bucket's items, sub-grouped where the bucket defines
+    sub-buckets. Sub-buckets in `SUB_BUCKET_DISPLAY_ORDER` come first
+    in their listed order; any sub-bucket not pre-ordered comes after
+    in alphabetical order; the synthetic 'other' is always last."""
+    by_sub: dict[str, list[tuple[str, int]]] = {}
+    for name, n in items:
+        sub = sub_bucket_for(name, bucket) or "other"
+        by_sub.setdefault(sub, []).append((name, n))
+
+    ordered = SUB_BUCKET_DISPLAY_ORDER.get(bucket)
+    if ordered is None:
+        # Fall back to declaration order from SUB_BUCKETS, with 'other' last.
+        ordered = tuple(s for s, _ in SUB_BUCKETS.get(bucket, ())) + ("other",)
+
+    seen: set[str] = set()
+    for sub in ordered:
+        sub_items = by_sub.get(sub)
+        seen.add(sub)
+        if not sub_items:
+            continue
+        print(f"  ({sub})")
+        for name, n in sub_items:
+            print(f"    {name:<{width}}  {n}")
+    # Pick up any straggler sub-buckets not in the display order.
+    for sub in sorted(set(by_sub) - seen):
+        print(f"  ({sub})")
+        for name, n in by_sub[sub]:
+            print(f"    {name:<{width}}  {n}")

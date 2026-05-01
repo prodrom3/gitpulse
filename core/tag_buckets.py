@@ -37,6 +37,7 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "ctf", "ctf-tools", "red-team-manual",
             "adversary-emulation", "owasp", "linux-pentesting",
             "netsec", "web-hacking", "ethical-hacking-tools",
+            "web-application-attacks",
         }),
     ),
     (
@@ -73,6 +74,9 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "domains", "endpoints", "subdomain-finder",
             "massdns", "information-gathering", "osint",
             "cms", "gf-patterns",
+            # Mindmap (Rohit Gautam) terms:
+            "vertical-corelation", "horizontal-corelation",
+            "acquisitions", "asn", "certificate-transparency",
         }),
     ),
     (
@@ -166,9 +170,136 @@ for _bucket_name, _tags in BUCKETS:
         _TAG_TO_BUCKET.setdefault(_tag, _bucket_name)
 
 
+# Optional second-level grouping. Only buckets with a clear
+# multi-axis taxonomy define sub-buckets; buckets without an entry
+# here are displayed flat. Within a bucket that has sub-buckets, a
+# tag not in any sub-bucket falls into a synthetic "(other)" group
+# at display time.
+SUB_BUCKETS: dict[str, tuple[tuple[str, frozenset[str]], ...]] = {
+    "attack-class": (
+        (
+            "web-attacks",
+            frozenset({
+                "xss", "dom-xss", "csrf", "xsrf", "ssrf",
+                "server-side-request-forgery", "cors",
+                "command-injection", "open-redirect",
+                "open-redirections", "crlf-injection",
+            }),
+        ),
+        (
+            "subdomain",
+            frozenset({
+                "subdomain-takeover", "subdomain-takeovers",
+                "takeover", "takeover-subdomain", "hostile",
+                "hostile-subdomain-takeover",
+            }),
+        ),
+        (
+            "crypto",
+            frozenset({
+                "hash-cracking", "bruteforce", "brute-force",
+                "brute-force-attacks", "bruteforce-wordlist",
+            }),
+        ),
+        (
+            "general",
+            frozenset({
+                "vulnerability", "vulnerabilities",
+                "security-vulnerability", "exploit", "exploitation",
+                "attack-surface", "vulnerable-libraries",
+                "insecure-libraries", "bypass", "obfuscation",
+                "reverse-shell", "privilege-escalation",
+            }),
+        ),
+    ),
+    "recon-technique": (
+        (
+            "subdomain",
+            frozenset({
+                "subdomain", "subdomains", "subdomain-bruteforcing",
+                "subdomain-finder", "vertical-corelation",
+                "horizontal-corelation",
+            }),
+        ),
+        (
+            "dns",
+            frozenset({
+                "dns", "dns-bruteforcer", "dns-resolution",
+                "dns-resolver", "massdns", "domains",
+            }),
+        ),
+        (
+            "port-network",
+            frozenset({
+                "port-scan", "port-scanner", "portscanner",
+                "port-enumeration", "scan-ports", "network-discovery",
+                "service-discovery", "service-enumeration",
+                "discovery-service", "cdn-exclusion",
+                "reverse-lookups", "fingerprint",
+            }),
+        ),
+        (
+            "vhost",
+            frozenset({
+                "virtual-host", "virtual-hosts", "vhost", "vhosts",
+            }),
+        ),
+        (
+            "content",
+            frozenset({
+                "content-discovery", "fuzzing", "dorking", "dork",
+                "dorks", "google-dorks",
+            }),
+        ),
+        (
+            "web-recon",
+            frozenset({
+                "github-recon", "visual-recon", "js-enumeration",
+                "wayback", "cms", "gf-patterns", "endpoints",
+                "certificate-transparency",
+            }),
+        ),
+        (
+            "osint",
+            frozenset({
+                "osint", "information-gathering", "reconnaissance",
+                "recon", "enumeration", "acquisitions", "asn",
+            }),
+        ),
+    ),
+}
+
+# Order to display sub-buckets within a bucket. Buckets not listed
+# fall back to insertion order from SUB_BUCKETS.
+SUB_BUCKET_DISPLAY_ORDER: dict[str, tuple[str, ...]] = {
+    "attack-class": ("web-attacks", "subdomain", "crypto", "general", "other"),
+    "recon-technique": (
+        "subdomain", "dns", "port-network", "vhost",
+        "content", "web-recon", "osint", "other",
+    ),
+}
+
+
 def bucket_for(tag: str) -> str:
     """Return the bucket name for a tag, or 'other' if unmatched."""
     return _TAG_TO_BUCKET.get(tag.strip().lower(), "other")
+
+
+def sub_bucket_for(tag: str, bucket: str) -> str | None:
+    """Return the sub-bucket name within `bucket` for `tag`.
+
+    Returns None when the bucket has no sub-buckets configured (i.e.
+    flat display). Returns 'other' when the bucket has sub-buckets
+    but the tag matches none of them.
+    """
+    sub_table = SUB_BUCKETS.get(bucket)
+    if sub_table is None:
+        return None
+    needle = tag.strip().lower()
+    for sub_name, members in sub_table:
+        if needle in members:
+            return sub_name
+    return "other"
 
 
 # Display order for `nostos tags --grouped`. Higher-signal buckets
@@ -188,4 +319,11 @@ DISPLAY_ORDER: tuple[str, ...] = (
 )
 
 
-__all__ = ["BUCKETS", "bucket_for", "DISPLAY_ORDER"]
+__all__ = [
+    "BUCKETS",
+    "bucket_for",
+    "DISPLAY_ORDER",
+    "SUB_BUCKETS",
+    "SUB_BUCKET_DISPLAY_ORDER",
+    "sub_bucket_for",
+]

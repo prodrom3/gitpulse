@@ -149,6 +149,64 @@ class TestTagsCommand(_TagsTestCase):
         for tag in ("recon", "xss", "python"):
             self.assertIn(tag, text)
 
+    def test_grouped_sub_buckets_within_attack_class(self):
+        # Mix of sub-bucketed tags within attack-class.
+        self._seed({
+            "/t/a": ["xss", "csrf"],         # web-attacks
+            "/t/b": ["subdomain-takeover"],  # subdomain
+            "/t/c": ["vulnerability"],       # general
+        })
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="grouped"))
+        text = out.getvalue()
+        # The bucket header is present:
+        self.assertIn("[attack-class]", text)
+        # And the sub-bucket headers appear in display order:
+        self.assertIn("(web-attacks)", text)
+        self.assertIn("(subdomain)", text)
+        self.assertIn("(general)", text)
+        self.assertLess(text.index("(web-attacks)"), text.index("(subdomain)"))
+        self.assertLess(text.index("(subdomain)"), text.index("(general)"))
+
+    def test_grouped_recon_sub_buckets(self):
+        self._seed({
+            "/t/a": ["dns", "subdomain"],         # dns + subdomain
+            "/t/b": ["github-recon", "wayback"],  # web-recon
+            "/t/c": ["osint"],                    # osint
+        })
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="grouped"))
+        text = out.getvalue()
+        self.assertIn("[recon-technique]", text)
+        self.assertIn("(subdomain)", text)
+        self.assertIn("(dns)", text)
+        self.assertIn("(web-recon)", text)
+        self.assertIn("(osint)", text)
+
+    def test_grouped_flat_buckets_have_no_sub_headers(self):
+        # `language` doesn't define sub-buckets - no `(...)` grouping.
+        self._seed({"/t/a": ["python", "golang"]})
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(grouping="grouped"))
+        text = out.getvalue()
+        self.assertIn("[language]", text)
+        self.assertNotIn("(", text)  # no sub-bucket parens at all
+
+    def test_json_includes_sub_bucket_field(self):
+        self._seed({"/t/a": ["xss", "python"]})
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+             mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_tags.run(self._args(json=True))
+        data = json.loads(out.getvalue())
+        by_name = {entry["name"]: entry for entry in data["tags"]}
+        # xss is in attack-class -> web-attacks sub-bucket
+        self.assertEqual(by_name["xss"]["sub_bucket"], "web-attacks")
+        # python's bucket has no sub-buckets defined -> sub_bucket is None
+        self.assertIsNone(by_name["python"]["sub_bucket"])
+
     def test_grouped_skips_empty_buckets(self):
         # A fleet with only language tags should produce only the
         # `[language]` section, no others.
