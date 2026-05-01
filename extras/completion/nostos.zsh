@@ -119,6 +119,7 @@ _nostos() {
                         'unalias:Remove alias entries by source name'
                         'export:Write rules as TOML to PATH or stdout'
                         'import:Load a rules TOML; merge or replace'
+                        'apply:Retroactively curate existing repo tags'
                     )
                     _arguments '1:subcommand:->topics_sub' '*::topics_arg:->topics_args'
                     case $state in
@@ -130,6 +131,8 @@ _nostos() {
                                 '--json[JSON output]' \
                                 '--merge[Union deny lists, overlay alias maps]' \
                                 '--replace[Replace the local rules]' \
+                                '--repo[Apply to a single repo]:target:' \
+                                '--dry-run[Print what would change without writing]' \
                                 '*:file:_files'
                             ;;
                     esac

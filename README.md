@@ -176,6 +176,11 @@ curl -sS https://example.com/rules.toml | nostos topics import -   # via stdin
 # Quick start: import the curated default rule set bundled with nostos
 nostos topics import extras/topic_rules/default.toml
 
+# Retroactively curate tags already in the index after editing rules
+nostos topics apply --dry-run     # preview what would change
+nostos topics apply               # apply for real (idempotent)
+nostos topics apply --repo /path/to/one/repo
+
 # Find C2 tools you haven't touched in 90 days
 nostos list --tag c2 --untouched-over 90
 

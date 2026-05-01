@@ -57,7 +57,7 @@ _nostos() {
         topics)
             local topics_sub="${words[2]:-}"
             if [[ $cword -eq 2 ]]; then
-                COMPREPLY=($(compgen -W "list deny allow alias unalias export import -h --help" -- "$cur"))
+                COMPREPLY=($(compgen -W "list deny allow alias unalias export import apply -h --help" -- "$cur"))
                 return
             fi
             case "$topics_sub" in
@@ -71,6 +71,8 @@ _nostos() {
                     COMPREPLY=($(compgen -f -- "$cur")) ;;
                 import)
                     COMPREPLY=($(compgen -W "--merge --replace -h --help" -f -- "$cur")) ;;
+                apply)
+                    COMPREPLY=($(compgen -W "--repo --dry-run --json -h --help" -- "$cur")) ;;
             esac
             ;;
         digest)

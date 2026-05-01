@@ -8,12 +8,12 @@ Sub-verbs:
 - `topics unalias SRC...`      drop alias entries
 - `topics export [PATH]`       write rules as TOML to PATH or stdout
 - `topics import FILE [...]`   load a rules TOML; merge or replace
+- `topics apply [...]`         retroactively curate existing repo tags
 
 Rules persist in $XDG_CONFIG_HOME/nostos/topic_rules.toml. They take
-effect on the next `nostos add --auto-tags` or `nostos refresh
---auto-tags`. Existing tag state on already-indexed repos is not
-rewritten retroactively - run `nostos refresh --all --auto-tags`
-after editing rules to re-curate the fleet.
+effect on the next `nostos add --auto-tags` / `nostos refresh
+--auto-tags`. Use `nostos topics apply` to retroactively curate tag
+state on already-indexed repos when the rules change.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import argparse
 import sys
 from typing import Any
 
+from .. import index as _index
 from ..topic_rules import (
     TopicRules,
     dump_rules,
@@ -30,7 +31,7 @@ from ..topic_rules import (
     parse_rules_from_text,
     save_rules,
 )
-from ._common import fail
+from ._common import fail, maybe_migrate_watchlist
 
 
 def add_parser(subparsers: Any) -> None:
@@ -40,7 +41,7 @@ def add_parser(subparsers: Any) -> None:
         description=(
             "Edit the topic curation file applied when --auto-tags imports "
             "upstream repo topics. Sub-verbs: list, deny, allow, alias, "
-            "unalias, export, import."
+            "unalias, export, import, apply."
         ),
     )
     sub = p.add_subparsers(dest="topics_command", metavar="SUBCOMMAND", required=True)
@@ -119,6 +120,34 @@ def add_parser(subparsers: Any) -> None:
         help="Replace the local rules with the imported set",
     )
     imp.set_defaults(mode="merge", func=run_import)
+
+    apl = sub.add_parser(
+        "apply",
+        help="Retroactively curate existing repo tags using current rules",
+        description=(
+            "Walk the metadata index and rewrite tags so they match the "
+            "current rule set: drop denied tags, rewrite alias-source tags "
+            "to their target. Tags not mentioned by any rule are left "
+            "alone. Idempotent: running twice produces the same result."
+        ),
+    )
+    apl.add_argument(
+        "--repo",
+        default=None,
+        metavar="PATH_OR_ID",
+        help="Apply to a single repo only (default: every indexed repo)",
+    )
+    apl.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print what would change but do not modify the index",
+    )
+    apl.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a JSON summary instead of human-readable lines",
+    )
+    apl.set_defaults(func=run_apply)
 
 
 def _print_rules(rules: TopicRules) -> None:
@@ -264,4 +293,102 @@ def run_import(args: argparse.Namespace) -> int:
         f"({len(final.deny)} deny, {len(final.alias)} alias) -> {path}",
         file=sys.stderr,
     )
+    return 0
+
+
+def _diff_tags(
+    current: list[str], rules: TopicRules
+) -> tuple[list[str], list[str]]:
+    """Return (to_remove, to_add) for a single repo.
+
+    Reuses the same rules.apply() pass that runs at merge time, so
+    apply-mode behaviour is identical to import-mode behaviour. The
+    diff is computed against `current` so already-correct repos are
+    no-ops (idempotent).
+    """
+    curated = set(rules.apply(current))
+    cur_set = {t.lower() for t in current}
+    to_remove = sorted(cur_set - curated)
+    to_add = sorted(curated - cur_set)
+    return to_remove, to_add
+
+
+def run_apply(args: argparse.Namespace) -> int:
+    maybe_migrate_watchlist()
+    rules = load_rules()
+    if not rules.deny and not rules.alias:
+        msg = "topics apply: no rules loaded; nothing to do"
+        if args.json:
+            import json as _json
+            print(_json.dumps({"changed": 0, "repos": []}))
+        else:
+            print(msg, file=sys.stderr)
+        return 0
+
+    try:
+        with _index.connect() as conn:
+            if args.repo is not None:
+                one = _index.get_repo(conn, args.repo)
+                targets = [one] if one else []
+            else:
+                targets = _index.list_repos(conn)
+    except OSError as e:
+        return fail(str(e))
+
+    if args.repo is not None and not targets:
+        return fail(f"not in index: {args.repo}")
+
+    changed: list[dict[str, Any]] = []
+    total_removed = 0
+    total_added = 0
+
+    for repo in targets:
+        current = repo.get("tags") or []
+        to_remove, to_add = _diff_tags(current, rules)
+        if not to_remove and not to_add:
+            continue
+        changed.append({
+            "path": repo["path"],
+            "removed": to_remove,
+            "added": to_add,
+        })
+        total_removed += len(to_remove)
+        total_added += len(to_add)
+        if args.dry_run:
+            continue
+        try:
+            with _index.connect() as conn:
+                if to_remove:
+                    _index.remove_tags(conn, repo["id"], to_remove)
+                if to_add:
+                    _index.add_tags(conn, repo["id"], to_add)
+        except OSError as e:
+            return fail(f"index write failed for {repo['path']}: {e}")
+
+    if args.json:
+        import json as _json
+        print(_json.dumps({
+            "dry_run": bool(args.dry_run),
+            "repos_changed": len(changed),
+            "tags_removed": total_removed,
+            "tags_added": total_added,
+            "changes": changed,
+        }, indent=2))
+    else:
+        prefix = "topics apply (dry-run): " if args.dry_run else "topics apply: "
+        print(
+            f"{prefix}{len(changed)} repo(s) changed, "
+            f"{total_removed} tag(s) removed, "
+            f"{total_added} tag(s) added.",
+            file=sys.stderr,
+        )
+        for entry in changed[:20]:
+            bits: list[str] = []
+            if entry["removed"]:
+                bits.append("-" + ", -".join(entry["removed"]))
+            if entry["added"]:
+                bits.append("+" + ", +".join(entry["added"]))
+            print(f"  {entry['path']}: {' '.join(bits)}", file=sys.stderr)
+        if len(changed) > 20:
+            print(f"  ...and {len(changed) - 20} more", file=sys.stderr)
     return 0
