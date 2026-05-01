@@ -18,6 +18,7 @@ the opsec guarantee documented in README > Security.
 from __future__ import annotations
 
 import argparse
+import datetime
 import logging
 import sys
 from typing import Any
@@ -28,7 +29,9 @@ from ..topic_rules import load_rules as load_topic_rules
 from ..upstream import (
     HostNotAllowed,
     ProbeError,
+    ProbeHTTPError,
     ProviderUnknown,
+    fetch_repo_advisories,
     parse_remote_url,
     probe_upstream,
 )
@@ -79,6 +82,14 @@ def add_parser(subparsers: Any) -> None:
         help="After each successful probe, merge the upstream repo's "
         "topics into the repo's tag list (additive; never removes tags). "
         "Quiet repos and unconfigured hosts are still skipped.",
+    )
+    p.add_argument(
+        "--cves",
+        action="store_true",
+        help="Also fetch GitHub Security Advisories per repo and store "
+        "the open-advisory count + top severity in upstream_meta. "
+        "Adds one extra paginated API call per repo on top of the "
+        "main probe; gated by the same auth.toml allowlist.",
     )
     p.add_argument(
         "--json",
@@ -187,6 +198,26 @@ def run(args: argparse.Namespace) -> int:
             except OSError:
                 pass
             continue
+
+        if getattr(args, "cves", False):
+            owner_for_cve = meta.get("owner") or ""
+            name_for_cve = meta.get("name") or ""
+            if owner_for_cve and name_for_cve and meta.get("provider") == "github":
+                try:
+                    cve_count, cve_top = fetch_repo_advisories(
+                        host, owner_for_cve, name_for_cve, auth.resolve_token(host),
+                    )
+                    meta["cve_count"] = cve_count
+                    meta["cve_top_severity"] = cve_top
+                    meta["cve_fetched_at"] = datetime.datetime.now(
+                        datetime.timezone.utc
+                    ).isoformat(timespec="seconds")
+                except ProbeHTTPError as e:
+                    # 404 here is unusual but means the repo went away
+                    # between the main probe and the advisory call.
+                    logging.debug(f"nostos refresh: cve fetch HTTP {e.status} for {path}")
+                except ProbeError as e:
+                    logging.debug(f"nostos refresh: cve fetch failed for {path}: {e}")
 
         try:
             with _index.connect() as conn:

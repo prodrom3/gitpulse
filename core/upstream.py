@@ -327,6 +327,79 @@ class GitHubProbe:
         return result
 
 
+# ---- security advisories (GitHub) ----
+
+
+_SEVERITY_RANK: dict[str, int] = {
+    "critical": 4, "high": 3, "medium": 2, "low": 1,
+}
+
+
+def fetch_repo_advisories(
+    host: str,
+    owner: str,
+    name: str,
+    token: str | None,
+    *,
+    timeout: float = 15.0,
+) -> tuple[int, str | None]:
+    """Return (count, top_severity) of open repo-level GitHub Security
+    Advisories.
+
+    "Open" means state in {"published","triaged"} - we exclude
+    "closed" (fixed) and "withdrawn" (revoked). The endpoint returns
+    repository-level advisories the maintainer has filed, NOT
+    Dependabot alerts (those require admin access).
+
+    Output:
+        (0, None)               - no open advisories.
+        (N, "critical"|"high"|"medium"|"low")
+                                - N advisories, top severity is the
+                                  highest level seen.
+
+    Raises ProbeHTTPError(404) when the repo doesn't exist.
+    Returns (0, None) on every other HTTP error (advisory fetch is
+    best-effort; we don't want a missing endpoint to mark a repo
+    "vulnerable").
+    """
+    base = GitHubProbe.api_base(host)
+    url = (
+        f"{base}/repos/{urllib.parse.quote(owner)}/"
+        f"{urllib.parse.quote(name)}/security-advisories?per_page=100"
+    )
+    try:
+        items = _github_list_paginated(
+            url, token=token, accept="application/vnd.github+json", timeout=timeout
+        )
+    except ProbeHTTPError as e:
+        if e.status == 404:
+            raise
+        # 403 (rate limit / disabled), 410, etc. - degrade gracefully.
+        return (0, None)
+    except ProbeError:
+        return (0, None)
+
+    open_severities: list[str] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        state = (item.get("state") or "").lower()
+        if state not in {"published", "triaged"}:
+            continue
+        sev = (item.get("severity") or "").lower()
+        if sev in _SEVERITY_RANK:
+            open_severities.append(sev)
+        else:
+            # Unknown severity - count it but flag as "low" for ranking
+            # purposes; better to under-report than over-report.
+            open_severities.append("low")
+
+    if not open_severities:
+        return (0, None)
+    top = max(open_severities, key=lambda s: _SEVERITY_RANK[s])
+    return (len(open_severities), top)
+
+
 # ---- bulk owner enumeration ----
 
 

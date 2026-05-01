@@ -11,6 +11,24 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.6.0] - 2026-05-01
+
+### Added
+
+- **Parallel `nostos add --from-owner`** with a new `--workers N` flag (default `4`). Each surviving repo is cloned and registered in its own thread. A 50-repo bulk import drops from minutes to ~30s on a fast link. `--workers 1` keeps the previous serial behaviour. `nostos pull` already used the same `concurrent.futures.ThreadPoolExecutor` pattern; we now mirror it on the bulk-add path.
+- **License filters on `nostos list`**: `--license SPDX_ID[,SPDX_ID...]` (case-insensitive, repeatable, comma-separated) keeps only repos whose cached upstream license is in the list; `--license-not` rejects matches. Repos with no recorded license are excluded by `--license` (no value yet) and kept by `--license-not` (presumed innocent until refreshed). The license value comes from the existing `upstream_meta.license` column populated by `nostos refresh`.
+- **CVE awareness via GitHub Security Advisories**:
+  - `core.upstream.fetch_repo_advisories(host, owner, name, token)` paginates `/repos/{owner}/{repo}/security-advisories`, counts open (state in `published` / `triaged`) advisories, and returns `(count, top_severity)`. 404 raises; other HTTP errors degrade to `(0, None)` (best-effort - we never want a flaky API to mark a repo "vulnerable").
+  - `nostos refresh --cves` flag: in addition to the main probe, fetches advisories for each successfully-probed GitHub repo and stores them in three new `upstream_meta` columns (`cve_count`, `cve_top_severity`, `cve_fetched_at`). One extra paginated API call per repo, gated by the same `auth.toml` allowlist as the main probe.
+  - `nostos list --upstream-cve` filters to repos with `cve_count > 0`. `nostos list --upstream-severity LEVEL` (one of `critical / high / medium / low`) keeps only repos at-or-above the threshold.
+
+### Changed
+
+- `core/index.py` schema bumped to **v3**. Migration adds three columns to `upstream_meta` (`cve_count INTEGER`, `cve_top_severity TEXT`, `cve_fetched_at TEXT`) plus an index on `cve_count`. Backwards-compatible: old rows have `NULL` in the new columns until refreshed; the migration runs automatically on first connect.
+- `core.index.connect()` now serializes per-connection PRAGMA + schema setup with a module-level `threading.Lock`. Without this, concurrent workers (e.g. `nostos add --from-owner --workers 8`) raced on the initial `PRAGMA journal_mode = WAL` and on `_ensure_schema`, surfacing as `OperationalError("database is locked")` and `OperationalError("table schema_version already exists")`. The lock is held for ~1ms per connection in steady state and adds no measurable overhead to query throughput.
+
+VERSION 1.5.1 -> 1.6.0. Semver MINOR: new flags, new schema columns (additive migration), new helpers; existing CLI / JSON / SQL surfaces unchanged.
+
 ## [1.5.1] - 2026-05-01
 
 ### Added

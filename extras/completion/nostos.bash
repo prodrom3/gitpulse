@@ -34,7 +34,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--tag --source --note --status --quiet-upstream --auto-tags --clone-dir --from-owner --include-forks --include-archived --limit --match --lang -h --help" -- "$cur"))
             ;;
         list)
-            COMPREPLY=($(compgen -W "--tag --status --untouched-over --upstream-archived --upstream-dormant --upstream-stale --json -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--tag --status --untouched-over --upstream-archived --upstream-dormant --upstream-stale --license --license-not --upstream-cve --upstream-severity --json -h --help" -- "$cur"))
             ;;
         show)
             COMPREPLY=($(compgen -W "--json -h --help" -- "$cur"))
@@ -55,7 +55,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--purge --cleanup-vault --yes -h --help" -- "$cur"))
             ;;
         refresh)
-            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --json -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --cves --json -h --help" -- "$cur"))
             ;;
         topics)
             local topics_sub="${words[2]:-}"

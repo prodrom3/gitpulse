@@ -85,6 +85,10 @@ _nostos() {
                         '--upstream-archived[Only archived upstream]' \
                         '--upstream-dormant[Dormant threshold]:days:' \
                         '--upstream-stale[Stale cache threshold]:days:' \
+                        '--license[Only repos with this SPDX license]:spdx_id:' \
+                        '--license-not[Reject repos with this license]:spdx_id:' \
+                        '--upstream-cve[Only repos with at least one open advisory]' \
+                        '--upstream-severity[Only repos at-or-above severity]:level:(critical high medium low)' \
                         '--json[JSON output]'
                     ;;
                 show)
@@ -122,6 +126,7 @@ _nostos() {
                         '--force[Same as --all]' \
                         '--offline[No network]' \
                         '--auto-tags[Merge upstream topics into tag list]' \
+                        '--cves[Also fetch GitHub Security Advisories]' \
                         '--json[JSON output]'
                     ;;
                 topics)

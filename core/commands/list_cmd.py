@@ -58,11 +58,55 @@ def add_parser(subparsers: Any) -> None:
         help="Only repos whose upstream cache is older than DAYS (or missing)",
     )
     p.add_argument(
+        "--license",
+        action="append",
+        default=[],
+        metavar="SPDX_ID",
+        help="Only repos whose upstream license is one of these "
+        "SPDX ids (case-insensitive, repeatable, or comma-separated). "
+        "Repos with no license recorded are excluded - run `refresh` first.",
+    )
+    p.add_argument(
+        "--license-not",
+        action="append",
+        default=[],
+        metavar="SPDX_ID",
+        help="Reject repos whose license matches any of these SPDX ids "
+        "(case-insensitive, repeatable, or comma-separated). Repos with "
+        "no license recorded are kept.",
+    )
+    p.add_argument(
+        "--upstream-cve",
+        action="store_true",
+        help="Only repos with at least one open security advisory recorded "
+        "(run `nostos refresh --cves` first)",
+    )
+    p.add_argument(
+        "--upstream-severity",
+        default=None,
+        metavar="LEVEL",
+        choices=["critical", "high", "medium", "low"],
+        help="Only repos whose top advisory is at or above this severity. "
+        "Implies --upstream-cve.",
+    )
+    p.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON (stable schema) instead of a table",
     )
     p.set_defaults(func=run)
+
+
+def _flatten_csv(raw: list[str]) -> list[str]:
+    """Split each entry on commas; strip; drop empties. Mirrors the
+    behaviour `nostos add --tag` and `nostos topics deny` use."""
+    out: list[str] = []
+    for item in raw or []:
+        for piece in str(item).split(","):
+            piece = piece.strip()
+            if piece:
+                out.append(piece)
+    return out
 
 
 _STATUS_COLOR = {
@@ -127,6 +171,9 @@ def run(args: argparse.Namespace) -> int:
 
         tag_filter = normalize_attack_tag(attack_filter)
 
+    licenses = _flatten_csv(getattr(args, "license", []))
+    licenses_not = _flatten_csv(getattr(args, "license_not", []))
+
     try:
         with _index.connect() as conn:
             repos = _index.list_repos(
@@ -137,8 +184,12 @@ def run(args: argparse.Namespace) -> int:
                 upstream_archived=getattr(args, "upstream_archived", False),
                 upstream_dormant_days=getattr(args, "upstream_dormant", None),
                 upstream_stale_days=getattr(args, "upstream_stale", None),
+                licenses=licenses or None,
+                licenses_not=licenses_not or None,
+                upstream_cve=getattr(args, "upstream_cve", False),
+                upstream_severity=getattr(args, "upstream_severity", None),
             )
-    except OSError as e:
+    except (OSError, ValueError) as e:
         print(f"nostos: error: {e}", file=sys.stderr)
         return 1
 

@@ -15,6 +15,7 @@ then the resulting local path is registered.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import os
 import re
 import sys
@@ -135,6 +136,14 @@ def add_parser(subparsers: Any) -> None:
         metavar="LANG",
         help="With --from-owner: only repos whose primary language is LANG "
         "(case-insensitive)",
+    )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="With --from-owner: number of concurrent clones (default: 4). "
+        "Set to 1 to clone serially.",
     )
 
     p.set_defaults(func=run)
@@ -363,24 +372,39 @@ def _run_from_owner(args: argparse.Namespace, cfg: dict[str, Any]) -> int:
         print(f"  {r['full_name']}  ({r.get('language') or '-'}, "
               f"stars={r['stargazers_count']})", file=sys.stderr)
 
-    succeeded = 0
-    failed = 0
-    for r in repos:
+    workers = max(1, int(getattr(args, "workers", 4) or 1))
+
+    def _clone_and_register(r: dict[str, Any]) -> tuple[str, int]:
         url = r.get("clone_url") or r.get("html_url") or ""
         if not url:
-            failed += 1
             print(
                 f"  ! {r['full_name']}: no clone URL in upstream metadata",
                 file=sys.stderr,
             )
-            continue
+            return r["full_name"], 1
         rc = _add_one(
             url, base_tags=base_tags, args=args, cfg=cfg, auto_tags=auto_tags,
         )
-        if rc == 0:
-            succeeded += 1
-        else:
-            failed += 1
+        return r["full_name"], rc
+
+    succeeded = 0
+    failed = 0
+    if workers == 1:
+        for r in repos:
+            _, rc = _clone_and_register(r)
+            if rc == 0:
+                succeeded += 1
+            else:
+                failed += 1
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_clone_and_register, r) for r in repos]
+            for fut in concurrent.futures.as_completed(futures):
+                _, rc = fut.result()
+                if rc == 0:
+                    succeeded += 1
+                else:
+                    failed += 1
 
     print(
         f"nostos add --from-owner {owner}: "

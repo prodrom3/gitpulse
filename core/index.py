@@ -16,6 +16,7 @@ import os
 import sqlite3
 import stat
 import sys
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -26,7 +27,7 @@ VALID_STATUSES: frozenset[str] = frozenset(
     {"new", "reviewed", "in-use", "dropped", "flagged"}
 )
 
-CURRENT_SCHEMA_VERSION: int = 2
+CURRENT_SCHEMA_VERSION: int = 3
 
 _SCHEMA_V1: str = """
 CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
@@ -97,11 +98,43 @@ CREATE INDEX idx_upstream_last_push ON upstream_meta(last_push);
 INSERT INTO schema_version VALUES (2);
 """
 
+# v3 adds GitHub Security Advisory awareness to upstream_meta:
+#   cve_count        - number of *open* (non-withdrawn) repo-level
+#                      advisories the upstream host returned at probe
+#                      time. NULL means "never fetched"; 0 means "fetched
+#                      and no open advisories".
+#   cve_top_severity - highest severity across those advisories, in
+#                      {"critical","high","medium","low"} or NULL.
+#   cve_fetched_at   - own TTL anchor; the security-advisories endpoint
+#                      is more expensive than the main repo probe and
+#                      is paginated, so we cache it independently of
+#                      fetched_at (which tracks the main probe).
+_MIGRATION_V2_TO_V3: str = """
+ALTER TABLE upstream_meta ADD COLUMN cve_count INTEGER;
+ALTER TABLE upstream_meta ADD COLUMN cve_top_severity TEXT;
+ALTER TABLE upstream_meta ADD COLUMN cve_fetched_at TEXT;
+CREATE INDEX idx_upstream_cve_count ON upstream_meta(cve_count);
+
+INSERT INTO schema_version VALUES (3);
+"""
+
 
 # ---------- connection / schema ----------
 
 
+# `PRAGMA journal_mode = WAL` does not respect busy_timeout: when
+# multiple concurrent connections race to set it on a freshly-opened
+# DB, they get sqlite3.OperationalError("database is locked") rather
+# than waiting. Schema init has a similar TOCTOU race (two threads
+# both see version=0 and both try to CREATE TABLE). Real query writes
+# work fine via WAL once setup is done, so we serialize only the
+# per-connection setup itself. The lock is held for ~1ms per
+# connection in steady state.
+_INIT_LOCK = threading.Lock()
+
+
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA secure_delete = ON")
     conn.execute("PRAGMA foreign_keys = ON")
@@ -141,6 +174,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     if version == 1:
         conn.executescript(_MIGRATION_V1_TO_V2)
         version = 2
+    if version == 2:
+        conn.executescript(_MIGRATION_V2_TO_V3)
+        version = 3
     conn.commit()
 
 
@@ -161,8 +197,12 @@ def connect(path: str | None = None) -> Iterator[sqlite3.Connection]:
     try:
         if is_new:
             _chmod_0600(path)
-        _apply_pragmas(conn)
-        _ensure_schema(conn)
+        # Serialize PRAGMA + schema setup across threads. Without this,
+        # `nostos add --from-owner --workers N` races on the initial
+        # WAL setup and on schema_version checks.
+        with _INIT_LOCK:
+            _apply_pragmas(conn)
+            _ensure_schema(conn)
         yield conn
     finally:
         conn.close()
@@ -262,6 +302,9 @@ def add_repo(
     return repo_id
 
 
+_SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+
 def list_repos(
     conn: sqlite3.Connection,
     *,
@@ -271,6 +314,10 @@ def list_repos(
     upstream_archived: bool = False,
     upstream_dormant_days: int | None = None,
     upstream_stale_days: int | None = None,
+    licenses: list[str] | None = None,
+    licenses_not: list[str] | None = None,
+    upstream_cve: bool = False,
+    upstream_severity: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return repos matching the given filters, newest-added first.
 
@@ -281,6 +328,15 @@ def list_repos(
       push date "dormant" without guessing).
     - upstream_stale_days: upstream cache older than N days OR missing
       (never fetched).
+    - licenses: only repos whose upstream license SPDX-id is in this
+      list (case-insensitive). Repos with no license recorded are
+      excluded; run `nostos refresh` first.
+    - licenses_not: inverse of `licenses`; rejects repos whose license
+      matches any entry. Repos with no license recorded are KEPT
+      (caller can stack with --license to require known licenses).
+    - upstream_cve: only repos with a non-zero `cve_count` recorded.
+    - upstream_severity: minimum severity level (critical / high /
+      medium / low). Implies upstream_cve.
     """
     where: list[str] = []
     params: list[Any] = []
@@ -323,6 +379,43 @@ def list_repos(
         )
         where.append("(u.fetched_at IS NULL OR u.fetched_at < ?)")
         params.append(cutoff.isoformat(timespec="seconds"))
+
+    if licenses:
+        normalized = [str(L).strip().lower() for L in licenses if L]
+        normalized = [L for L in normalized if L]
+        if normalized:
+            placeholders = ",".join("?" * len(normalized))
+            where.append(
+                f"u.license IS NOT NULL AND LOWER(u.license) IN ({placeholders})"
+            )
+            params.extend(normalized)
+
+    if licenses_not:
+        normalized = [str(L).strip().lower() for L in licenses_not if L]
+        normalized = [L for L in normalized if L]
+        if normalized:
+            placeholders = ",".join("?" * len(normalized))
+            # Keep repos with NULL license (we don't know they're disallowed).
+            where.append(
+                f"(u.license IS NULL OR LOWER(u.license) NOT IN ({placeholders}))"
+            )
+            params.extend(normalized)
+
+    if upstream_severity is not None:
+        sev = upstream_severity.strip().lower()
+        if sev not in _SEVERITY_ORDER:
+            valid = sorted(_SEVERITY_ORDER, key=lambda s: _SEVERITY_ORDER[s], reverse=True)
+            raise ValueError(f"upstream_severity must be one of {valid}")
+        threshold = _SEVERITY_ORDER[sev]
+        # Only repos at-or-above the threshold severity.
+        accepted = [s for s, level in _SEVERITY_ORDER.items() if level >= threshold]
+        placeholders = ",".join("?" * len(accepted))
+        where.append(
+            f"u.cve_count > 0 AND LOWER(u.cve_top_severity) IN ({placeholders})"
+        )
+        params.extend(accepted)
+    elif upstream_cve:
+        where.append("u.cve_count IS NOT NULL AND u.cve_count > 0")
 
     sql = "SELECT r.* FROM repos r LEFT JOIN upstream_meta u ON u.repo_id = r.id"
     if where:
@@ -575,6 +668,9 @@ _UPSTREAM_COLUMNS = (
     "latest_release",
     "fetched_at",
     "fetch_error",
+    "cve_count",
+    "cve_top_severity",
+    "cve_fetched_at",
 )
 
 

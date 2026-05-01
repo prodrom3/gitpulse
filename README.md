@@ -165,10 +165,16 @@ nostos add https://github.com/guelfoweb/knock        --tag subdomain,recon --aut
 nostos add https://github.com/projectdiscovery/subfinder --tag subdomain,recon --auto-tags
 
 # Bulk-ingest every public repo of a GitHub user / org (requires auth.toml)
-nostos add --from-owner projectdiscovery --tag recon --auto-tags
+nostos add --from-owner projectdiscovery --tag recon --auto-tags --workers 8
 nostos add --from-owner tomnomnom --tag hacks --auto-tags --lang go --limit 20
 nostos add --from-owner orgname --tag c2 --auto-tags \
     --include-forks --match '^(mythic|caldera)' --clone-dir ~/repos
+
+# DevSecOps queries against the cached fleet (run `nostos refresh --all --cves` first)
+nostos list --license MIT,Apache-2.0          # only permissively-licensed repos
+nostos list --license-not GPL-3.0,AGPL-3.0    # reject copyleft for our product
+nostos list --upstream-cve                    # repos with at least one open advisory
+nostos list --upstream-severity high          # high+ severity only
 
 # Backfill topics across the whole fleet on the next refresh
 nostos refresh --all --auto-tags
