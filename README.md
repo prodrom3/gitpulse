@@ -19,6 +19,20 @@
 
 > **nostos** is a Python CLI for batch-updating and curating fleets of git repositories in parallel. Built for developers and platform teams who maintain dozens - or hundreds - of cloned repositories and need a reliable, auditable, scriptable way to keep them in sync.
 
+### At a glance
+
+| | |
+| --- | --- |
+| **License** | [MIT](./LICENSE) |
+| **Runtime** | Python 3.10+ (one runtime dependency: `argcomplete`) |
+| **Platforms** | Linux, macOS, Windows (CI matrix: Python 3.10 / 3.11 / 3.12 / 3.13) |
+| **Install** | `pipx install nostos`, `pip install nostos`, or `pip install -e .` from a clone |
+| **Storage** | Local SQLite at `$XDG_DATA_HOME/nostos/index.db` (mode `0600` on Unix). No telemetry, no remote service. |
+| **Network posture** | Fail-closed. Hosts not listed in `~/.config/nostos/auth.toml` are never contacted, ever. `--offline` is a global kill switch. |
+| **Supply chain** | PyPI releases built and published via GitHub Actions OIDC trusted publishing (no static API tokens). Hardened clone path mitigates CVE-2024-32002 / 32004 / 32465. |
+| **Versioning** | Strict [SemVer](https://semver.org/) 2.0; full per-release rationale in [CHANGELOG.md](CHANGELOG.md). |
+| **Maintainers** | See [MAINTAINERS.md](MAINTAINERS.md). Vulnerability disclosure: [SECURITY.md](SECURITY.md). |
+
 ---
 
 ## Overview
@@ -332,6 +346,39 @@ Skipped repositories (dirty, detached, no upstream) do **not** fail the run - th
 ```cron
 # crontab
 */30 * * * *  /usr/local/bin/nostos ~/projects --quiet --fetch-only
+```
+
+### Headless / service-account deployment
+
+For internal mirror boxes, build runners, or cron-driven curation jobs:
+
+- **No interactive prompts.** Every verb is non-interactive when given the inputs it needs. `nostos triage` is the only exception (interactive by design); skip it on headless boxes and use `nostos list --status new` + `nostos tag` from a script instead.
+- **Stable JSON for scripting.** `pull`, `list`, `show`, `refresh`, `digest`, `dashboard`, `topics list / apply`, `search`, and `tags` all support `--json`. Schemas evolve only across major versions.
+- **Predictable exit codes.** `0` = success, `1` = at least one repo failed, `2` = usage / invalid args. Skipped repos do *not* fail the run.
+- **Tokens via environment variables only.** `~/.config/nostos/auth.toml` references token names (`token_env = "GITHUB_TOKEN"`); the actual secret lives in the service account's environment, never the repo or the index.
+- **Air-gapped operation.** `nostos refresh --offline`, `nostos update --offline`, `nostos add` against an already-cloned local path, and every read-only verb work without any network access.
+- **Logs in a known place.** `$XDG_DATA_HOME/nostos/logs/` (`%LOCALAPPDATA%\nostos\logs\` on Windows). Mode `0600`. Rotated to the most recent 20 (configurable). Credentials are sanitized before being written.
+- **Index portability.** `nostos export --redact` produces a JSON bundle with notes/source stripped; `nostos import` rebuilds it on a fresh host. Use this for DR snapshots, cross-region replication, or onboarding a new team member.
+
+```ini
+# /etc/systemd/system/nostos-pull.service  (oneshot)
+[Service]
+Type=oneshot
+User=nostos
+Environment=GITHUB_TOKEN=...
+Environment=XDG_DATA_HOME=/var/lib/nostos
+Environment=XDG_CONFIG_HOME=/etc/nostos
+ExecStart=/usr/local/bin/nostos pull --from-index --quiet --json
+```
+
+```ini
+# /etc/systemd/system/nostos-pull.timer
+[Timer]
+OnCalendar=*:0/30          ; every 30 minutes
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 ```
 
 ---

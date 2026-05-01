@@ -11,6 +11,15 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.6.2] - 2026-05-01
+
+### Documentation
+
+- README: new **At a glance** fact box near the top with license, runtime, platforms, install, storage, network posture, supply chain, versioning policy, and pointers to MAINTAINERS.md / SECURITY.md / CHANGELOG.md. Lets an enterprise reviewer answer "is this a fit?" in 30 seconds without reading prose.
+- README: new **Headless / service-account deployment** subsection under CI / automation. Covers non-interactive guarantees, stable JSON output across verbs, exit-code semantics, env-var-only token handling, air-gapped operation, log locations, and ready-to-use systemd unit + timer templates for an unattended mirror box.
+
+VERSION 1.6.1 -> 1.6.2. Semver PATCH: docs-only.
+
 ## [1.6.1] - 2026-05-01
 
 ### Added
