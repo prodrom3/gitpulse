@@ -153,6 +153,12 @@ nostos --fetch-only --quiet --json | jq '.counts'
 nostos add https://github.com/org/tool.git --tag recon --source "blog:orange.tw"
 nostos triage
 
+# Ingest with auto-fetched repo topics from the upstream host (requires auth.toml)
+nostos add https://github.com/r4ulcl/Mythic-OSEP-CheatSheet --tag osep,c2 --auto-tags
+
+# Backfill topics across the whole fleet on the next refresh
+nostos refresh --all --auto-tags
+
 # Find C2 tools you haven't touched in 90 days
 nostos list --tag c2 --untouched-over 90
 
@@ -178,6 +184,10 @@ clone_dir     = /home/user/repos
 
 [exclude]
 patterns = archived-*, .backup-*, vendor-*
+
+[add]
+auto_tags = false             # default. Set true to make `nostos add` always
+                              # fetch repo topics from the upstream host.
 ```
 
 ### Environment variables

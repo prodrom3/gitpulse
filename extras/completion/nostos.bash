@@ -31,7 +31,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--dry-run --fetch-only --rebase --depth --workers --timeout --exclude --from-index --watchlist --json -q --quiet -h --help" -- "$cur"))
             ;;
         add)
-            COMPREPLY=($(compgen -W "--tag --source --note --status --quiet-upstream --clone-dir -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--tag --source --note --status --quiet-upstream --auto-tags --clone-dir -h --help" -- "$cur"))
             ;;
         list)
             COMPREPLY=($(compgen -W "--tag --status --untouched-over --upstream-archived --upstream-dormant --upstream-stale --json -h --help" -- "$cur"))
@@ -52,7 +52,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--purge --cleanup-vault --yes -h --help" -- "$cur"))
             ;;
         refresh)
-            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --json -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --json -h --help" -- "$cur"))
             ;;
         digest)
             COMPREPLY=($(compgen -W "--since --stale --dormant --json -h --help" -- "$cur"))

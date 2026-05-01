@@ -65,6 +65,7 @@ _nostos() {
                         '--note[Initial note]:note:' \
                         '--status[Initial status]:status:($statuses)' \
                         '--quiet-upstream[Opsec: never probe upstream]' \
+                        '--auto-tags[Fetch repo topics from upstream as tags]' \
                         '--clone-dir[Clone directory]:dir:_directories' \
                         '1:target:_files'
                     ;;
@@ -104,6 +105,7 @@ _nostos() {
                         '--all[Refresh everything]' \
                         '--force[Same as --all]' \
                         '--offline[No network]' \
+                        '--auto-tags[Merge upstream topics into tag list]' \
                         '--json[JSON output]'
                     ;;
                 digest)
