@@ -80,10 +80,38 @@ deny = [
 "vulnerability-scanners"         = "vulnerability"
 "vulnerability-scanner"          = "vulnerability"
 
+# --- XSS family ---
+"xss-exploitation"               = "xss"
+"xss-vulnerability"              = "xss"
+"cross-site-scripting"           = "xss"
+
+# --- Greenbone / OpenVAS family (Greenbone is the rebranded OpenVAS suite;
+#     GVM = Greenbone Vulnerability Management; CE is the community edition) ---
+"greenbone-community-edition"        = "greenbone"
+"greenbone-vulnerability-management" = "greenbone"
+"gvm"                                = "greenbone"
+"openvas-scanner"                    = "openvas"
+
+# --- Metasploit family ---
+"metasploit-payloads"            = "metasploit"
+"launch-metasploit"              = "metasploit"
+
+# --- Brute-force ---
+"brute-force"                    = "bruteforce"
+"brute-force-attacks"            = "bruteforce"
+
+# --- Web testing ---
+"web-penetration-testing"        = "pentest"
+"web-application"                = "websec"
+
+# --- Linux noise ---
+"linux-hacking-tools"            = "linux"
+
 # --- Typos seen in the wild ---
 "sheatsheet"                     = "cheatsheet"
 "cybersecurty"                   = "cybersecurity"
 "cyber-security"                 = "cybersecurity"
+"offensivesecurity"              = "offensive-security"
 
 # --- Language variants (light touch) ---
 "python3"                        = "python"

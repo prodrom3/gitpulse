@@ -11,6 +11,21 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.2] - 2026-05-01
+
+### Changed
+
+- `extras/topic_rules/default.toml`: 15 additional alias entries covering universal collapses for security tooling. The bundled rule set now ships **2 deny + 64 alias** entries (was 2 + 49). New collapses:
+  - **XSS family**: `xss-exploitation`, `xss-vulnerability`, `cross-site-scripting` -> `xss`.
+  - **Greenbone / OpenVAS family**: `gvm`, `greenbone-community-edition`, `greenbone-vulnerability-management` -> `greenbone`; `openvas-scanner` -> `openvas`. (Greenbone is the rebranded OpenVAS suite; GVM is the same project under its enterprise name.)
+  - **Metasploit family**: `metasploit-payloads`, `launch-metasploit` -> `metasploit`.
+  - **Brute-force**: `brute-force`, `brute-force-attacks` -> `bruteforce`.
+  - **Web testing**: `web-penetration-testing` -> `pentest`; `web-application` -> `websec`.
+  - **Linux noise**: `linux-hacking-tools` -> `linux`.
+  - **Typo**: `offensivesecurity` -> `offensive-security`.
+
+Operators who already imported `default.toml` under 1.4.0 / 1.4.1 can pick up the new entries with `nostos topics import extras/topic_rules/default.toml` (default `--merge`) followed by `nostos topics apply` to retroactively curate the index.
+
 ## [1.4.1] - 2026-05-01
 
 ### Added
