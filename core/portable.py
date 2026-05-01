@@ -134,6 +134,16 @@ def build_bundle(
     fields for fleet inventory sharing).
     """
     repos = _index.list_repos(conn)
+    repo_ids = [int(r["id"]) for r in repos]
+
+    # Single batched fetches in place of N+1 per-repo round-trips:
+    # - notes:    skipped under redact (we strip them anyway)
+    # - upstream: always fetched
+    notes_by_id: dict[int, list[dict[str, Any]]] = (
+        {} if redact else _index.get_notes_batch(conn, repo_ids)
+    )
+    upstream_by_id = _index.get_upstream_meta_batch(conn, repo_ids)
+
     out_repos: list[dict[str, Any]] = []
     for repo in repos:
         repo_id = int(repo["id"])
@@ -156,9 +166,9 @@ def build_bundle(
         if not redact:
             entry["notes"] = [
                 {"body": n["body"], "created_at": n["created_at"]}
-                for n in _index.get_notes(conn, repo_id)
+                for n in notes_by_id.get(repo_id, [])
             ]
-        um = _index.get_upstream_meta(conn, repo_id)
+        um = upstream_by_id.get(repo_id)
         if um:
             # Strip the repo_id fk; it is regenerated on import.
             entry["upstream"] = {k: v for k, v in um.items() if k != "repo_id"}

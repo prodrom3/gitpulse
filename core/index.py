@@ -423,10 +423,12 @@ def list_repos(
     sql += " ORDER BY r.added_at DESC, r.id DESC"
 
     rows = conn.execute(sql, params).fetchall()
+    repo_ids = [int(row["id"]) for row in rows]
+    tags_by_id = _get_tags_for_repos(conn, repo_ids)
     result = []
     for row in rows:
         repo = _row_to_dict(row)
-        repo["tags"] = _get_tags_for_repo(conn, int(row["id"]))
+        repo["tags"] = tags_by_id.get(int(row["id"]), [])
         result.append(repo)
     return result
 
@@ -556,6 +558,96 @@ def _get_tags_for_repo(conn: sqlite3.Connection, repo_id: int) -> list[str]:
     return [row["name"] for row in rows]
 
 
+# SQLite default SQLITE_LIMIT_VARIABLE_NUMBER is 999 on older builds
+# (32766 on modern). Stay safely under either with margin for joins.
+_PARAM_CHUNK: int = 500
+
+
+def _chunked(iterable: list[int], size: int = _PARAM_CHUNK) -> Iterator[list[int]]:
+    """Yield successive chunks of `size` from `iterable`."""
+    for i in range(0, len(iterable), size):
+        yield iterable[i : i + size]
+
+
+def _get_tags_for_repos(
+    conn: sqlite3.Connection, repo_ids: list[int]
+) -> dict[int, list[str]]:
+    """Batched equivalent of `_get_tags_for_repo` across many repos.
+
+    Replaces the O(N) "loop and call per repo" pattern with O(1) SQL
+    queries (chunked when needed). Output: `{repo_id: [tag_name, ...]}`
+    with each list sorted alphabetically and every requested repo_id
+    represented (empty list when no tags). Behaviour is identical to
+    calling `_get_tags_for_repo(conn, rid)` per repo and stitching.
+    """
+    out: dict[int, list[str]] = {rid: [] for rid in repo_ids}
+    if not repo_ids:
+        return out
+    for chunk in _chunked(list(repo_ids)):
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT rt.repo_id, t.name FROM tags t
+            JOIN repo_tags rt ON rt.tag_id = t.id
+            WHERE rt.repo_id IN ({placeholders})
+            ORDER BY t.name
+            """,
+            chunk,
+        ).fetchall()
+        for row in rows:
+            out[int(row["repo_id"])].append(row["name"])
+    return out
+
+
+def get_upstream_meta_batch(
+    conn: sqlite3.Connection, repo_ids: list[int]
+) -> dict[int, dict[str, Any] | None]:
+    """Batched equivalent of `get_upstream_meta` across many repos.
+
+    Output: `{repo_id: meta_dict or None}` with every requested
+    repo_id represented. Used by `nostos doctor` and the export
+    bundle path to avoid N+1 queries.
+    """
+    out: dict[int, dict[str, Any] | None] = {rid: None for rid in repo_ids}
+    if not repo_ids:
+        return out
+    for chunk in _chunked(list(repo_ids)):
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"SELECT * FROM upstream_meta WHERE repo_id IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        for row in rows:
+            out[int(row["repo_id"])] = _row_to_dict(row)
+    return out
+
+
+def get_notes_batch(
+    conn: sqlite3.Connection, repo_ids: list[int]
+) -> dict[int, list[dict[str, Any]]]:
+    """Batched equivalent of `get_notes` across many repos.
+
+    Output: `{repo_id: [note_dict, ...]}` with notes ordered by
+    created_at ascending then id ascending (stable across runs).
+    """
+    out: dict[int, list[dict[str, Any]]] = {rid: [] for rid in repo_ids}
+    if not repo_ids:
+        return out
+    for chunk in _chunked(list(repo_ids)):
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT * FROM notes
+            WHERE repo_id IN ({placeholders})
+            ORDER BY created_at ASC, id ASC
+            """,
+            chunk,
+        ).fetchall()
+        for row in rows:
+            out[int(row["repo_id"])].append(_row_to_dict(row))
+    return out
+
+
 def get_tags(conn: sqlite3.Connection, selector: str | int) -> list[str]:
     repo_id = _resolve_repo_id(conn, selector)
     if repo_id is None:
@@ -608,10 +700,12 @@ def search_repos(
         params.append(int(limit))
 
     rows = conn.execute(sql, params).fetchall()
+    repo_ids = [int(row["id"]) for row in rows]
+    tags_by_id = _get_tags_for_repos(conn, repo_ids)
     out: list[dict[str, Any]] = []
     for row in rows:
         repo = _row_to_dict(row)
-        repo["tags"] = _get_tags_for_repo(conn, int(row["id"]))
+        repo["tags"] = tags_by_id.get(int(row["id"]), [])
         out.append(repo)
     return out
 

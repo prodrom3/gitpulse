@@ -11,6 +11,37 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.6.3] - 2026-05-01
+
+### Changed
+
+- **N+1 query elimination across the read paths.** Four call sites that previously did one SQL round-trip per repo now do one batched query total:
+
+  | Call site | Before | After |
+  | --- | --- | --- |
+  | `core.index.list_repos` | 1 + N (tags per repo) | 1 + 1 |
+  | `core.index.search_repos` | 1 + N (tags per repo) | 1 + 1 |
+  | `core.doctor.run_checks` | 1 + N (upstream_meta per repo) | 1 + 1 |
+  | `core.portable.build_bundle` | 1 + 2N (notes + upstream_meta per repo) | 1 + 2 |
+
+  Output is byte-identical; this is a pure refactor. The win is invisible at <100 repos but compounds linearly: a 1000-repo `nostos list` drops from ~1001 SQLite calls to 2.
+
+- New batched helpers in `core/index.py`:
+  - `_get_tags_for_repos(conn, repo_ids) -> dict[int, list[str]]`
+  - `get_upstream_meta_batch(conn, repo_ids) -> dict[int, dict | None]`
+  - `get_notes_batch(conn, repo_ids) -> dict[int, list[dict]]`
+
+  Each helper chunks input at 500 ids per query to stay under SQLite's `SQLITE_LIMIT_VARIABLE_NUMBER` on older builds (default 999), preserving correctness on fleets >500 repos.
+
+### Tests
+
+- 11 new tests in `tests/test_batched_queries.py`:
+  - **Equivalence**: every batched helper produces the same per-repo output as the per-repo helper it replaces.
+  - **Chunking**: a 750-repo fleet round-trips correctly across the 500-id chunk boundary.
+  - **Regression guards**: `_CountingConnection` wraps the SQLite connection and asserts exactly 1 tag query during `list_repos` / `search_repos`, and exactly 1 notes + 1 upstream query during `build_bundle`. These guards fail loudly if a future change accidentally reintroduces an N+1 loop.
+
+VERSION 1.6.2 -> 1.6.3. Semver PATCH: pure internal refactor; no public API or behaviour changes.
+
 ## [1.6.2] - 2026-05-01
 
 ### Documentation

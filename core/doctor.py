@@ -64,6 +64,10 @@ def run_checks(
     repos = _index.list_repos(conn)
     report["total_repos"] = len(repos)
 
+    # Single batched fetch instead of N queries (one per repo).
+    repo_ids = [int(r["id"]) for r in repos]
+    upstream_by_id = _index.get_upstream_meta_batch(conn, repo_ids)
+
     for repo in repos:
         path = repo["path"]
         repo_id = int(repo["id"])
@@ -77,8 +81,7 @@ def run_checks(
         if repo.get("quiet") and not repo.get("remote_url"):
             report["quiet_no_remote"].append({"id": repo_id, "path": path})
 
-        meta = _index.get_upstream_meta(conn, repo_id)
-        if meta is None:
+        if upstream_by_id.get(repo_id) is None:
             report["missing_upstream"].append({"id": repo_id, "path": path})
 
     report["duplicate_tags"] = _check_duplicate_tags(conn)
