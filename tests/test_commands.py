@@ -64,6 +64,7 @@ class TestAdd(_IndexTestCase):
             note="initial",
             status="new",
             quiet_upstream=False,
+            auto_tags=False,
             clone_dir=None,
         )
         rc = cmd_add.run(args)
@@ -82,6 +83,7 @@ class TestAdd(_IndexTestCase):
             note=None,
             status="new",
             quiet_upstream=False,
+            auto_tags=False,
             clone_dir=None,
         )
         rc = cmd_add.run(args)
@@ -103,6 +105,7 @@ class TestAdd(_IndexTestCase):
                 note=None,
                 status="new",
                 quiet_upstream=False,
+                auto_tags=False,
                 clone_dir=clone_dir,
             )
             rc = cmd_add.run(args)
@@ -122,12 +125,99 @@ class TestAdd(_IndexTestCase):
             note=None,
             status="new",
             quiet_upstream=True,
+            auto_tags=False,
             clone_dir=None,
         )
         cmd_add.run(args)
         with index.connect(self.db) as conn:
             rows = index.list_repos(conn)
         self.assertEqual(rows[0]["quiet"], 1)
+
+    def test_auto_tags_merges_upstream_topics(self):
+        clone_dir = os.path.join(self.tmp, "clones")
+        os.makedirs(clone_dir)
+        cloned = os.path.join(clone_dir, "repo")
+        os.makedirs(os.path.join(cloned, ".git"))
+
+        fake_meta = {"topics": ["c2", "redteam", "Mythic"]}
+
+        with mock.patch("core.commands.add.clone_repo", return_value=cloned), \
+             mock.patch("core.commands.add.probe_upstream", return_value=fake_meta), \
+             mock.patch(
+                 "core.commands.add.load_auth",
+                 return_value=mock.Mock(is_allowed=lambda h: True),
+             ):
+            args = argparse.Namespace(
+                target="https://github.com/u/repo.git",
+                tag=["existing"],
+                source=None,
+                note=None,
+                status="new",
+                quiet_upstream=False,
+                auto_tags=True,
+                clone_dir=clone_dir,
+            )
+            rc = cmd_add.run(args)
+
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            rows = index.list_repos(conn)
+        # Topics merged, lowercased, deduplicated against existing tag.
+        self.assertEqual(sorted(rows[0]["tags"]), ["c2", "existing", "mythic", "redteam"])
+
+    def test_auto_tags_skipped_when_quiet_upstream(self):
+        clone_dir = os.path.join(self.tmp, "clones")
+        os.makedirs(clone_dir)
+        cloned = os.path.join(clone_dir, "repo")
+        os.makedirs(os.path.join(cloned, ".git"))
+
+        with mock.patch("core.commands.add.clone_repo", return_value=cloned), \
+             mock.patch("core.commands.add.probe_upstream") as mock_probe:
+            args = argparse.Namespace(
+                target="https://github.com/u/repo.git",
+                tag=[],
+                source=None,
+                note=None,
+                status="new",
+                quiet_upstream=True,
+                auto_tags=True,
+                clone_dir=clone_dir,
+            )
+            rc = cmd_add.run(args)
+
+        self.assertEqual(rc, 0)
+        mock_probe.assert_not_called()
+
+    def test_auto_tags_host_not_allowed_warns_and_continues(self):
+        clone_dir = os.path.join(self.tmp, "clones")
+        os.makedirs(clone_dir)
+        cloned = os.path.join(clone_dir, "repo")
+        os.makedirs(os.path.join(cloned, ".git"))
+
+        with mock.patch("core.commands.add.clone_repo", return_value=cloned), \
+             mock.patch("core.commands.add.probe_upstream") as mock_probe, \
+             mock.patch(
+                 "core.commands.add.load_auth",
+                 return_value=mock.Mock(is_allowed=lambda h: False),
+             ):
+            args = argparse.Namespace(
+                target="https://github.com/u/repo.git",
+                tag=["manual"],
+                source=None,
+                note=None,
+                status="new",
+                quiet_upstream=False,
+                auto_tags=True,
+                clone_dir=clone_dir,
+            )
+            rc = cmd_add.run(args)
+
+        self.assertEqual(rc, 0)
+        # Fail-closed: probe never runs when host isn't in auth.toml.
+        mock_probe.assert_not_called()
+        with index.connect(self.db) as conn:
+            rows = index.list_repos(conn)
+        self.assertEqual(rows[0]["tags"], ["manual"])
 
 
 class TestList(_IndexTestCase):

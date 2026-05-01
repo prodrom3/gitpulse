@@ -14,7 +14,15 @@ import sys
 from typing import Any
 
 from .. import index as _index
+from ..auth import load_auth
 from ..config import load_config
+from ..upstream import (
+    HostNotAllowed,
+    ProbeError,
+    ProviderUnknown,
+    parse_remote_url,
+    probe_upstream,
+)
 from ..watchlist import clone_repo, is_remote_url
 from ._common import fail, maybe_migrate_watchlist
 
@@ -59,6 +67,15 @@ def add_parser(subparsers: Any) -> None:
         help="Opsec flag: never query upstream metadata for this repo",
     )
     p.add_argument(
+        "--auto-tags",
+        action="store_true",
+        default=None,
+        help="Fetch repo topics from the upstream host and merge them into "
+        "--tag values. Requires the host to be configured in auth.toml. "
+        "Skipped silently if --quiet-upstream is also set. "
+        "Default in config: [add] auto_tags = false.",
+    )
+    p.add_argument(
         "--clone-dir",
         default=None,
         metavar="DIR",
@@ -77,16 +94,71 @@ def _flatten_tags(raw: list[str]) -> list[str]:
     return tags
 
 
+def _fetch_upstream_topics(remote_url: str) -> list[str]:
+    """Probe the remote host for repo topics. Returns [] on any failure.
+
+    Caller is responsible for the --quiet-upstream short-circuit; this
+    helper assumes the user has opted in. Failures are reported on
+    stderr but never raise: --auto-tags is best-effort.
+    """
+    parsed = parse_remote_url(remote_url)
+    if parsed is None:
+        print(
+            f"nostos add: --auto-tags: cannot parse remote URL ({remote_url}); "
+            "skipping topic fetch.",
+            file=sys.stderr,
+        )
+        return []
+    host, _, _ = parsed
+
+    auth = load_auth()
+    if not auth.is_allowed(host):
+        print(
+            f"nostos add: --auto-tags: host {host} is not configured in "
+            "auth.toml; skipping topic fetch. See "
+            "docs/upstream-probes.md to configure a token.",
+            file=sys.stderr,
+        )
+        return []
+
+    try:
+        meta = probe_upstream(remote_url, auth, offline=False)
+    except HostNotAllowed:
+        return []
+    except ProviderUnknown as e:
+        print(f"nostos add: --auto-tags: {e}; skipping topic fetch.", file=sys.stderr)
+        return []
+    except ProbeError as e:
+        print(
+            f"nostos add: --auto-tags: upstream probe failed ({e}); "
+            "skipping topic fetch.",
+            file=sys.stderr,
+        )
+        return []
+
+    topics = meta.get("topics") or []
+    return [str(t) for t in topics if isinstance(t, str)]
+
+
+def _resolve_auto_tags(cli_value: bool | None, cfg: dict[str, Any]) -> bool:
+    """CLI flag overrides config; config defaults to False."""
+    if cli_value is not None:
+        return cli_value
+    return bool(cfg.get("add_auto_tags", False))
+
+
 def run(args: argparse.Namespace) -> int:
     maybe_migrate_watchlist()
 
+    cfg = load_config()
     target = args.target
     tags = _flatten_tags(args.tag)
+    auto_tags = _resolve_auto_tags(getattr(args, "auto_tags", None), cfg)
 
     if is_remote_url(target):
         clone_dir = args.clone_dir
         if clone_dir is None:
-            clone_dir = load_config()["clone_dir"] or os.getcwd()
+            clone_dir = cfg["clone_dir"] or os.getcwd()
         local_path = clone_repo(target, clone_dir)
         if local_path is None:
             return fail(f"clone failed: {target}")
@@ -97,6 +169,22 @@ def run(args: argparse.Namespace) -> int:
         if not os.path.isdir(os.path.join(os.path.expanduser(repo_path), ".git")):
             return fail(f"not a git repository: {repo_path}")
         remote_url = None
+
+    if auto_tags and remote_url and not args.quiet_upstream:
+        fetched = _fetch_upstream_topics(remote_url)
+        if fetched:
+            existing = {t.lower() for t in tags}
+            new_topics = [t for t in fetched if t.lower() not in existing]
+            tags.extend(new_topics)
+            if new_topics:
+                print(
+                    f"nostos add: --auto-tags: fetched {len(new_topics)} topic(s) "
+                    f"from upstream: {', '.join(new_topics)}",
+                    file=sys.stderr,
+                )
+    elif auto_tags and args.quiet_upstream:
+        # Opsec: --quiet-upstream wins. Do not log the URL or warn loudly.
+        pass
 
     try:
         with _index.connect() as conn:

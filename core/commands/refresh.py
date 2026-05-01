@@ -73,6 +73,13 @@ def add_parser(subparsers: Any) -> None:
         help="Kill switch: make zero network calls (prints what would be refreshed)",
     )
     p.add_argument(
+        "--auto-tags",
+        action="store_true",
+        help="After each successful probe, merge the upstream repo's "
+        "topics into the repo's tag list (additive; never removes tags). "
+        "Quiet repos and unconfigured hosts are still skipped.",
+    )
+    p.add_argument(
         "--json",
         action="store_true",
         help="Emit a JSON summary instead of human-readable lines",
@@ -121,6 +128,7 @@ def run(args: argparse.Namespace) -> int:
     skipped_unauthorised = 0
     failed = 0
     errors: list[dict[str, Any]] = []
+    tagged_repos: list[dict[str, Any]] = []  # populated when --auto-tags is on
 
     for repo in targets:
         path = repo["path"]
@@ -182,6 +190,10 @@ def run(args: argparse.Namespace) -> int:
         try:
             with _index.connect() as conn:
                 _index.upsert_upstream_meta(conn, repo["id"], meta)
+                if args.auto_tags:
+                    new_tags = _merge_topic_tags(conn, repo["id"], meta.get("topics") or [])
+                    if new_tags:
+                        tagged_repos.append({"path": path, "added": new_tags})
             refreshed += 1
         except OSError as e:
             failed += 1
@@ -195,6 +207,9 @@ def run(args: argparse.Namespace) -> int:
         "failed": failed,
         "errors": errors,
     }
+    if args.auto_tags:
+        summary["tagged_repos"] = tagged_repos
+        summary["tags_added"] = sum(len(t["added"]) for t in tagged_repos)
 
     if args.json:
         import json as _json
@@ -209,9 +224,35 @@ def run(args: argparse.Namespace) -> int:
             f"(targets: {len(targets)})",
             file=sys.stderr,
         )
+        if args.auto_tags and tagged_repos:
+            total = sum(len(t["added"]) for t in tagged_repos)
+            print(
+                f"  + auto-tags: added {total} new topic tag(s) "
+                f"across {len(tagged_repos)} repo(s)",
+                file=sys.stderr,
+            )
+            for t in tagged_repos[:10]:
+                print(f"    {t['path']}: +{', '.join(t['added'])}", file=sys.stderr)
+            if len(tagged_repos) > 10:
+                print(f"    ...and {len(tagged_repos) - 10} more", file=sys.stderr)
         for err in errors[:10]:
             print(f"  ! {err['path']}: {err['error']}", file=sys.stderr)
         if len(errors) > 10:
             print(f"  ...and {len(errors) - 10} more", file=sys.stderr)
 
     return 1 if failed else 0
+
+
+def _merge_topic_tags(
+    conn: Any, repo_id: int, topics: list[str]
+) -> list[str]:
+    """Add upstream topics as tags on a repo. Returns the list of tags
+    that were actually new (i.e. not already attached). Existing tags
+    are never removed."""
+    if not topics:
+        return []
+    existing = {t.lower() for t in _index.get_tags(conn, repo_id)}
+    new_tags = [t for t in topics if isinstance(t, str) and t.lower() not in existing]
+    if new_tags:
+        _index.add_tags(conn, repo_id, new_tags)
+    return new_tags

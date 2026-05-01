@@ -67,6 +67,7 @@ def load_config() -> dict[str, Any]:
         "clone_dir": None,
         "vault_path": None,
         "vault_subdir": "repos",
+        "add_auto_tags": False,
     }
 
     if not os.path.isfile(config_path):
@@ -101,5 +102,8 @@ def load_config() -> dict[str, Any]:
         subdir = parser.get("vault", "subdir", fallback="").strip()
         if subdir:
             result["vault_subdir"] = subdir
+
+    if parser.has_section("add"):
+        result["add_auto_tags"] = parser.getboolean("add", "auto_tags", fallback=False)
 
     return result

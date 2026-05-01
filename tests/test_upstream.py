@@ -98,6 +98,7 @@ class TestGitHubProbe(unittest.TestCase):
             "default_branch": "main",
             "pushed_at": "2026-04-10T00:00:00Z",
             "license": {"spdx_id": "MIT"},
+            "topics": ["c2", "Redteam", "redteam", "", 42, "mythic"],
         }
         release_body = {"tag_name": "v1.2.3"}
 
@@ -115,6 +116,21 @@ class TestGitHubProbe(unittest.TestCase):
         self.assertEqual(result["last_push"], "2026-04-10T00:00:00Z")
         self.assertEqual(result["license"], "MIT")
         self.assertEqual(result["latest_release"], "v1.2.3")
+        # Topics are lowercased, deduped, non-strings dropped.
+        self.assertEqual(result["topics"], ["c2", "redteam", "mythic"])
+
+    def test_fetch_topics_missing_returns_empty_list(self):
+        probe = GitHubProbe()
+        repo_body = {"archived": False, "default_branch": "main"}
+
+        def fake_urlopen(req, timeout=15):
+            if req.full_url.endswith("/releases/latest"):
+                raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, io.BytesIO(b""))
+            return _ok(repo_body)
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = probe.fetch("github.com", "o", "r", None)
+        self.assertEqual(result["topics"], [])
 
     def test_sends_bearer_token(self):
         captured = []

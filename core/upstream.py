@@ -176,6 +176,28 @@ def _short_http_message(body: str) -> str:
     return ""
 
 
+def _clean_topics(raw: Any) -> list[str]:
+    """Coerce a provider's topics field into a list of clean lowercase tags.
+
+    Accepts None, list, or junk; rejects empty strings and non-strings.
+    Topic strings from GitHub/GitLab/Gitea are already kebab-case, but
+    we lowercase defensively and dedupe while preserving order.
+    """
+    if not isinstance(raw, list):
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        name = item.strip().lower()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    return out
+
+
 def _respect_rate_limit(headers: dict[str, str]) -> None:
     """Sleep briefly when a provider reports we are near zero remaining."""
     remaining = headers.get("X-RateLimit-Remaining") or headers.get(
@@ -238,6 +260,7 @@ class GitHubProbe:
             "license": license_name,
             "last_push": data.get("pushed_at"),
             "latest_release": None,
+            "topics": _clean_topics(data.get("topics")),
         }
 
         # Latest release (optional; a repo with no releases returns 404).
@@ -297,6 +320,7 @@ class GitLabProbe:
             or (data.get("license") or {}).get("key"),
             "last_push": last_push,
             "latest_release": None,
+            "topics": _clean_topics(data.get("topics") or data.get("tag_list")),
         }
 
         try:
@@ -366,6 +390,7 @@ class GiteaProbe:
             "license": None,
             "last_push": data.get("updated_at"),
             "latest_release": None,
+            "topics": _clean_topics(data.get("topics")),
         }
         return result
 

@@ -45,6 +45,7 @@ def _refresh_args(**overrides):
         "all": False,
         "force": False,
         "offline": False,
+        "auto_tags": False,
         "json": False,
     }
     base.update(overrides)
@@ -181,6 +182,115 @@ class TestRefreshErrorHandling(_IndexTestCase):
             {"targets", "refreshed", "skipped_quiet", "skipped_unauthorised", "failed", "errors"},
         )
         self.assertEqual(data["skipped_quiet"], 1)
+
+
+class TestRefreshAutoTags(_IndexTestCase):
+    def _seed_repo(self, *, tags=None):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(
+                conn,
+                "/t/r",
+                remote_url="git@github.com:o/r.git",
+                source="test",
+                tags=tags or [],
+            )
+        return rid
+
+    def _meta(self, **overrides):
+        base = {
+            "provider": "github",
+            "host": "github.com",
+            "owner": "o",
+            "name": "r",
+            "stars": 1,
+            "archived": False,
+            "default_branch": "main",
+            "last_push": "2026-04-10T00:00:00Z",
+            "fetched_at": "2026-04-15T00:00:00+00:00",
+            "topics": ["c2", "redteam", "Mythic"],
+        }
+        base.update(overrides)
+        return base
+
+    def test_auto_tags_off_does_not_touch_tags(self):
+        rid = self._seed_repo(tags=["manual"])
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=self._meta()
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_refresh.run(_refresh_args())
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            self.assertEqual(index.get_tags(conn, rid), ["manual"])
+
+    def test_auto_tags_on_merges_topics(self):
+        rid = self._seed_repo(tags=["manual"])
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=self._meta()
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_refresh.run(_refresh_args(auto_tags=True))
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            tags = index.get_tags(conn, rid)
+        # Existing tag preserved; topics merged in lowercase.
+        self.assertEqual(sorted(tags), ["c2", "manual", "mythic", "redteam"])
+
+    def test_auto_tags_idempotent_on_repeat_refresh(self):
+        rid = self._seed_repo()
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=self._meta()
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_refresh.run(_refresh_args(auto_tags=True, all=True))
+            cmd_refresh.run(_refresh_args(auto_tags=True, all=True))
+        with index.connect(self.db) as conn:
+            tags = index.get_tags(conn, rid)
+        self.assertEqual(sorted(tags), ["c2", "mythic", "redteam"])
+
+    def test_auto_tags_json_summary_includes_breakdown(self):
+        self._seed_repo()
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=self._meta()
+        ), mock.patch("sys.stdout", new_callable=io.StringIO) as out, mock.patch(
+            "sys.stderr", new_callable=io.StringIO
+        ):
+            cmd_refresh.run(_refresh_args(auto_tags=True, json=True))
+        data = json.loads(out.getvalue())
+        self.assertEqual(data["tags_added"], 3)
+        self.assertEqual(len(data["tagged_repos"]), 1)
+        self.assertEqual(
+            sorted(data["tagged_repos"][0]["added"]),
+            ["Mythic", "c2", "redteam"],
+        )
+
+    def test_auto_tags_skipped_for_quiet_repo(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(
+                conn,
+                "/t/q",
+                remote_url="git@github.com:o/q.git",
+                quiet=True,
+            )
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=self._meta()
+        ) as mock_probe, mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_refresh.run(_refresh_args(auto_tags=True, all=True))
+        mock_probe.assert_not_called()
+        with index.connect(self.db) as conn:
+            self.assertEqual(index.get_tags(conn, rid), [])
 
 
 class TestListUpstreamFilters(_IndexTestCase):
