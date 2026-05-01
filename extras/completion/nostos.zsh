@@ -16,6 +16,7 @@ verbs=(
     'triage:Walk newly-added repositories and classify them'
     'rm:Remove a repository from the metadata index'
     'refresh:Fetch upstream metadata for registered repositories'
+    'topics:Manage topic curation rules (deny / alias)'
     'digest:Print a weekly changeset report'
     'vault:Bridge the metadata index with an Obsidian vault'
     'export:Write a portable JSON bundle of the metadata index'
@@ -107,6 +108,25 @@ _nostos() {
                         '--offline[No network]' \
                         '--auto-tags[Merge upstream topics into tag list]' \
                         '--json[JSON output]'
+                    ;;
+                topics)
+                    local -a topics_subs
+                    topics_subs=(
+                        'list:Show current rules'
+                        'deny:Add topics to the deny list'
+                        'allow:Remove topics from the deny list'
+                        'alias:Rewrite SRC to DST during topic import'
+                        'unalias:Remove alias entries by source name'
+                    )
+                    _arguments '1:subcommand:->topics_sub' '*::topics_arg:->topics_args'
+                    case $state in
+                        topics_sub)
+                            _describe 'topics subcommand' topics_subs
+                            ;;
+                        topics_args)
+                            _arguments '--json[JSON output]'
+                            ;;
+                    esac
                     ;;
                 digest)
                     _arguments \

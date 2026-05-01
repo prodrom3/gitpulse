@@ -7,7 +7,7 @@ _nostos() {
     local cur prev words cword
     _init_completion || return
 
-    local verbs="pull add list show tag note triage rm refresh digest vault export import update"
+    local verbs="pull add list show tag note triage rm refresh topics digest vault export import update"
     local vault_subs="export sync"
     local statuses="new reviewed in-use dropped flagged"
 
@@ -53,6 +53,21 @@ _nostos() {
             ;;
         refresh)
             COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --json -h --help" -- "$cur"))
+            ;;
+        topics)
+            local topics_sub="${words[2]:-}"
+            if [[ $cword -eq 2 ]]; then
+                COMPREPLY=($(compgen -W "list deny allow alias unalias -h --help" -- "$cur"))
+                return
+            fi
+            case "$topics_sub" in
+                list)
+                    COMPREPLY=($(compgen -W "--json -h --help" -- "$cur")) ;;
+                deny|allow|unalias)
+                    COMPREPLY=($(compgen -W "-h --help" -- "$cur")) ;;
+                alias)
+                    COMPREPLY=($(compgen -W "-h --help" -- "$cur")) ;;
+            esac
             ;;
         digest)
             COMPREPLY=($(compgen -W "--since --stale --dormant --json -h --help" -- "$cur"))

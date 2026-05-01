@@ -109,6 +109,7 @@ nostos is verb-first: `nostos <verb> [args]`. An invocation without a verb is an
 | `note` | Append a timestamped note. |
 | `triage` | Walk newly-added repos interactively and classify them. |
 | `refresh` | Fetch upstream metadata. Opsec-gated. See [docs/upstream-probes.md](docs/upstream-probes.md). |
+| `topics` | Manage topic curation rules (deny / alias) applied when `--auto-tags` imports upstream topics. |
 | `digest` | Weekly changeset report (zero network). |
 | `dashboard` | Render a static HTML fleet health report. |
 | `vault` | Obsidian vault bridge (`export` / `sync`). See [docs/vault.md](docs/vault.md). |
@@ -158,6 +159,13 @@ nostos add https://github.com/r4ulcl/Mythic-OSEP-CheatSheet --tag osep,c2 --auto
 
 # Backfill topics across the whole fleet on the next refresh
 nostos refresh --all --auto-tags
+
+# Curate the imported topics: drop junk, collapse synonyms
+nostos topics deny foo hacktoberfest ubuntu
+nostos topics alias red-teaming redteam
+nostos topics alias penetration-testing pentest
+nostos topics list
+nostos refresh --all --auto-tags         # re-curate the fleet
 
 # Find C2 tools you haven't touched in 90 days
 nostos list --tag c2 --untouched-over 90
