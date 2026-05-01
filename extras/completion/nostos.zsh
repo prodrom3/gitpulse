@@ -69,6 +69,12 @@ _nostos() {
                         '--quiet-upstream[Opsec: never probe upstream]' \
                         '--auto-tags[Fetch repo topics from upstream as tags]' \
                         '--clone-dir[Clone directory]:dir:_directories' \
+                        '--from-owner[Bulk-add every public repo of a GitHub user / org]:owner:' \
+                        '--include-forks[With --from-owner: also include forked repos]' \
+                        '--include-archived[With --from-owner: also include archived repos]' \
+                        '--limit[With --from-owner: cap to top N by stars]:n:' \
+                        '--match[With --from-owner: only repos whose name matches REGEX]:regex:' \
+                        '--lang[With --from-owner: only repos in this language]:lang:' \
                         '1:target:_files'
                     ;;
                 list)

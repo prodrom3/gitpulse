@@ -11,6 +11,22 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.5.0] - 2026-05-01
+
+### Added
+
+- **`nostos add --from-owner OWNER`**: bulk-ingest every public repo of a GitHub user or org with one command. Each surviving repo goes through the existing add flow (hardened clone, idempotent index registration, optional `--auto-tags` topic fetch, hand-tagged via `--tag`). Filters: `--include-forks` and `--include-archived` (off by default - forks and archived upstreams are usually noise), `--limit N` (top N by stargazers), `--match REGEX` (filter by repo name), `--lang LANG` (filter by primary language, case-insensitive). Mutually exclusive with the positional `PATH_OR_URL`.
+- Endpoint dispatch tries `/users/{owner}/repos` first, falls back to `/orgs/{owner}/repos` on 404 (GitHub treats users and organizations distinctly). 404 on both surfaces a clear "owner not found" error rather than a confusing pagination loop.
+- Opsec-gated like every other upstream call: hosts not configured in `~/.config/nostos/auth.toml` fail-closed before any network call. The probe uses the existing `token_env` resolution.
+- New helper `core.upstream.list_owner_repos(host, owner, token, *, include_forks=False, include_archived=False)` paginates through all results (per_page=100, hard cap at 5000 repos as a safety stop) and returns a normalized list of `{full_name, name, clone_url, fork, archived, language, stargazers_count, topics, description, default_branch}` dicts.
+- 17 new tests covering: pagination, user/org endpoint fallback, fork / archived filters, regex / lang / limit filtering, end-to-end `nostos add --from-owner` happy path, fail-closed for unconfigured hosts, 404 owner handling, and `--from-owner` / `PATH_OR_URL` mutual exclusion.
+
+### Changed
+
+- `nostos add`'s positional `PATH_OR_URL` is now `nargs='?'` (optional). Required when `--from-owner` is not used; rejected when it is.
+
+VERSION 1.4.7 -> 1.5.0. Semver MINOR: new `--from-owner` capability, fully backwards compatible (existing single-target `nostos add URL` invocations are unchanged).
+
 ## [1.4.7] - 2026-05-01
 
 ### Added

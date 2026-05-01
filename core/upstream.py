@@ -162,6 +162,52 @@ def _http_get_json(
     return data, headers
 
 
+def _http_get_json_list(
+    url: str,
+    *,
+    token: str | None = None,
+    accept: str | None = None,
+    timeout: float = 15.0,
+) -> tuple[list[Any], dict[str, str]]:
+    """Like `_http_get_json` but expects a list response.
+
+    Raises ProbeHTTPError on HTTP 4xx/5xx, ProbeError on parse/timeout
+    failures or unexpected (non-list) JSON shape.
+    """
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "nostos")
+    if accept:
+        req.add_header("Accept", accept)
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            headers = {k: v for k, v in resp.headers.items()}
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except OSError:
+            body = ""
+        msg = _short_http_message(body) or e.reason or ""
+        raise ProbeHTTPError(e.code, f"{e.code} {msg}") from None
+    except urllib.error.URLError as e:
+        raise ProbeError(f"network error: {e.reason}") from None
+    except TimeoutError:
+        raise ProbeError("timeout") from None
+    except OSError as e:
+        raise ProbeError(f"os error: {e}") from None
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        raise ProbeError(f"invalid JSON from upstream: {e}") from None
+    if not isinstance(data, list):
+        raise ProbeError("unexpected JSON shape from upstream (expected list)")
+    return data, headers
+
+
 def _short_http_message(body: str) -> str:
     """Extract a short human message from a JSON error body, never a token."""
     try:
@@ -279,6 +325,116 @@ class GitHubProbe:
             pass
 
         return result
+
+
+# ---- bulk owner enumeration ----
+
+
+_PAGINATION_SAFETY_CAP: int = 50  # max pages, i.e. 5000 repos at per_page=100
+
+
+def _github_list_paginated(
+    base_url: str,
+    *,
+    token: str | None,
+    accept: str,
+    timeout: float,
+) -> list[Any]:
+    """Fetch every page of a GitHub list endpoint.
+
+    Stops when a page returns fewer than per_page items or the safety
+    cap is hit. Returns the concatenated list of items. Caller is
+    responsible for filtering / shaping the entries.
+    """
+    out: list[Any] = []
+    page = 1
+    per_page = 100
+    while page <= _PAGINATION_SAFETY_CAP:
+        sep = "&" if "?" in base_url else "?"
+        url = f"{base_url}{sep}per_page={per_page}&page={page}"
+        items, headers = _http_get_json_list(
+            url, token=token, accept=accept, timeout=timeout
+        )
+        _respect_rate_limit(headers)
+        if not items:
+            break
+        out.extend(items)
+        if len(items) < per_page:
+            break
+        page += 1
+    return out
+
+
+def list_owner_repos(
+    host: str,
+    owner: str,
+    token: str | None,
+    *,
+    include_forks: bool = False,
+    include_archived: bool = False,
+    timeout: float = 30.0,
+) -> list[dict[str, Any]]:
+    """Return repo metadata for every public repo owned by an entity.
+
+    Tries `/users/{owner}/repos` first; falls back to
+    `/orgs/{owner}/repos` if the user endpoint 404s. (GitHub treats
+    users and organizations distinctly: the user endpoint returns no
+    rows for an org slug, and vice versa.)
+
+    Filters:
+        include_forks=False  - drop repos where `fork` is true
+        include_archived=False - drop repos where `archived` is true
+
+    Returns a list of dicts with the fields a caller needs to clone
+    and tag the repo: full_name, name, clone_url, fork, archived,
+    language, stargazers_count, topics, description, default_branch.
+
+    Raises:
+        ProbeHTTPError(404) when neither endpoint resolves (owner
+        does not exist).
+        ProbeError on network / parse failures.
+    """
+    base = GitHubProbe.api_base(host)
+    accept = "application/vnd.github+json"
+
+    user_url = f"{base}/users/{urllib.parse.quote(owner)}/repos"
+    org_url = f"{base}/orgs/{urllib.parse.quote(owner)}/repos"
+
+    try:
+        raw = _github_list_paginated(
+            user_url, token=token, accept=accept, timeout=timeout
+        )
+    except ProbeHTTPError as e:
+        if e.status != 404:
+            raise
+        raw = _github_list_paginated(
+            org_url, token=token, accept=accept, timeout=timeout
+        )
+
+    out: list[dict[str, Any]] = []
+    for repo in raw:
+        if not isinstance(repo, dict):
+            continue
+        if not include_forks and repo.get("fork"):
+            continue
+        if not include_archived and repo.get("archived"):
+            continue
+        out.append({
+            "full_name": str(repo.get("full_name") or ""),
+            "name": str(repo.get("name") or ""),
+            "clone_url": str(
+                repo.get("clone_url") or repo.get("html_url") or ""
+            ),
+            "html_url": str(repo.get("html_url") or ""),
+            "fork": bool(repo.get("fork")),
+            "archived": bool(repo.get("archived")),
+            "language": repo.get("language"),
+            "stargazers_count": int(repo.get("stargazers_count") or 0),
+            "topics": _clean_topics(repo.get("topics")),
+            "description": repo.get("description"),
+            "default_branch": repo.get("default_branch"),
+        })
+    return out
 
 
 # ---- GitLab (gitlab.com + self-hosted) ----

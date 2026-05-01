@@ -1,15 +1,22 @@
 """`nostos add` - ingest a repo into the metadata index.
 
-Accepts either a local path to an existing git repository or a remote
-URL. When given a URL, the repo is cloned first (via the hardened
-clone routine, with hooks disabled) and then the resulting local path
-is registered.
+Accepts:
+- a local path to an existing git repository, OR
+- a remote URL (HTTPS or SSH), OR
+- `--from-owner OWNER` to bulk-ingest every public repo of a GitHub
+  user / org with optional filters (--include-forks,
+  --include-archived, --limit, --match, --lang).
+
+For URL targets the repo is cloned first via the hardened clone
+routine (hooks disabled, CVE-2024-32002/32004/32465 mitigated) and
+then the resulting local path is registered.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from typing import Any
 
@@ -20,7 +27,9 @@ from ..topic_rules import load_rules as load_topic_rules
 from ..upstream import (
     HostNotAllowed,
     ProbeError,
+    ProbeHTTPError,
     ProviderUnknown,
+    list_owner_repos,
     parse_remote_url,
     probe_upstream,
 )
@@ -37,7 +46,10 @@ def add_parser(subparsers: Any) -> None:
     p.add_argument(
         "target",
         metavar="PATH_OR_URL",
-        help="Local path to a git repository, or a remote URL to clone",
+        nargs="?",
+        default=None,
+        help="Local path to a git repository, or a remote URL to clone. "
+        "Optional when --from-owner is set.",
     )
     p.add_argument(
         "--tag",
@@ -82,6 +94,49 @@ def add_parser(subparsers: Any) -> None:
         metavar="DIR",
         help="Directory to clone into when target is a URL (default: cwd or config)",
     )
+
+    # --- Bulk owner ingest (GitHub only for now) ---
+    p.add_argument(
+        "--from-owner",
+        default=None,
+        metavar="OWNER",
+        help="Bulk-add every public repo of a GitHub user or org. "
+        "Replaces the positional PATH_OR_URL. Skips forks and "
+        "archived repos by default (override with --include-forks / "
+        "--include-archived). Tags / source / note flags apply to "
+        "every imported repo.",
+    )
+    p.add_argument(
+        "--include-forks",
+        action="store_true",
+        help="With --from-owner: also include forked repositories",
+    )
+    p.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="With --from-owner: also include archived repositories",
+    )
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="With --from-owner: cap to the top N repos by stargazers",
+    )
+    p.add_argument(
+        "--match",
+        default=None,
+        metavar="REGEX",
+        help="With --from-owner: only repos whose name matches this regex",
+    )
+    p.add_argument(
+        "--lang",
+        default=None,
+        metavar="LANG",
+        help="With --from-owner: only repos whose primary language is LANG "
+        "(case-insensitive)",
+    )
+
     p.set_defaults(func=run)
 
 
@@ -150,13 +205,18 @@ def _resolve_auto_tags(cli_value: bool | None, cfg: dict[str, Any]) -> bool:
     return bool(cfg.get("add_auto_tags", False))
 
 
-def run(args: argparse.Namespace) -> int:
-    maybe_migrate_watchlist()
-
-    cfg = load_config()
-    target = args.target
-    tags = _flatten_tags(args.tag)
-    auto_tags = _resolve_auto_tags(getattr(args, "auto_tags", None), cfg)
+def _add_one(
+    target: str,
+    *,
+    base_tags: list[str],
+    args: argparse.Namespace,
+    cfg: dict[str, Any],
+    auto_tags: bool,
+) -> int:
+    """Add a single repo (URL or local path). Returns 0 on success, 1 on
+    failure. Mirrors the original `run()` body so it can be called from
+    the single-target path and the bulk `--from-owner` path."""
+    tags = list(base_tags)
 
     if is_remote_url(target):
         clone_dir = args.clone_dir
@@ -185,9 +245,6 @@ def run(args: argparse.Namespace) -> int:
                     f"from upstream: {', '.join(new_topics)}",
                     file=sys.stderr,
                 )
-    elif auto_tags and args.quiet_upstream:
-        # Opsec: --quiet-upstream wins. Do not log the URL or warn loudly.
-        pass
 
     try:
         with _index.connect() as conn:
@@ -204,6 +261,160 @@ def run(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as e:
         return fail(str(e))
 
-    print(f"Added to index (id={repo_id}): {os.path.realpath(os.path.expanduser(repo_path))}",
-          file=sys.stderr, flush=True)
+    print(
+        f"Added to index (id={repo_id}): "
+        f"{os.path.realpath(os.path.expanduser(repo_path))}",
+        file=sys.stderr,
+        flush=True,
+    )
     return 0
+
+
+def _filter_owner_repos(
+    repos: list[dict[str, Any]],
+    *,
+    match: str | None,
+    lang: str | None,
+    limit: int | None,
+) -> list[dict[str, Any]]:
+    """Apply --match / --lang / --limit to the result of list_owner_repos."""
+    out = list(repos)
+    if match:
+        try:
+            pattern = re.compile(match)
+        except re.error as e:
+            raise ValueError(f"--match: invalid regex {match!r}: {e}") from None
+        out = [r for r in out if pattern.search(r.get("name") or "")]
+    if lang:
+        target = lang.strip().lower()
+        out = [
+            r for r in out
+            if isinstance(r.get("language"), str)
+            and r["language"].lower() == target
+        ]
+    if limit is not None and limit > 0:
+        out = sorted(out, key=lambda r: r.get("stargazers_count", 0), reverse=True)
+        out = out[:limit]
+    return out
+
+
+def _run_from_owner(args: argparse.Namespace, cfg: dict[str, Any]) -> int:
+    """Bulk-add every public repo of a GitHub user / org."""
+    owner = args.from_owner.strip()
+    if not owner:
+        return fail("--from-owner: OWNER must be non-empty")
+
+    # GitHub-only for now. Hardcode the host; future GitLab/Gitea support
+    # would route through a small dispatcher off the host argument.
+    host = "github.com"
+
+    auth = load_auth()
+    if not auth.is_allowed(host):
+        return fail(
+            f"--from-owner: host {host} is not configured in auth.toml. "
+            "Add a [hosts.\"github.com\"] block with token_env to enable."
+        )
+    token = auth.resolve_token(host)
+
+    print(
+        f"nostos add --from-owner {owner}: querying {host} ...",
+        file=sys.stderr,
+    )
+    try:
+        repos = list_owner_repos(
+            host,
+            owner,
+            token,
+            include_forks=args.include_forks,
+            include_archived=args.include_archived,
+        )
+    except ProbeHTTPError as e:
+        if e.status == 404:
+            return fail(
+                f"--from-owner: owner {owner!r} not found on {host} "
+                "(neither user nor org)."
+            )
+        return fail(f"--from-owner: upstream error: {e}")
+    except ProbeError as e:
+        return fail(f"--from-owner: upstream error: {e}")
+
+    try:
+        repos = _filter_owner_repos(
+            repos, match=args.match, lang=args.lang, limit=args.limit,
+        )
+    except ValueError as e:
+        return fail(str(e))
+
+    if not repos:
+        print(
+            "nostos add --from-owner: no repos matched the filters.",
+            file=sys.stderr,
+        )
+        return 0
+
+    base_tags = _flatten_tags(args.tag)
+    auto_tags = _resolve_auto_tags(getattr(args, "auto_tags", None), cfg)
+
+    print(
+        f"nostos add --from-owner {owner}: {len(repos)} repo(s) to ingest:",
+        file=sys.stderr,
+    )
+    for r in repos:
+        print(f"  {r['full_name']}  ({r.get('language') or '-'}, "
+              f"stars={r['stargazers_count']})", file=sys.stderr)
+
+    succeeded = 0
+    failed = 0
+    for r in repos:
+        url = r.get("clone_url") or r.get("html_url") or ""
+        if not url:
+            failed += 1
+            print(
+                f"  ! {r['full_name']}: no clone URL in upstream metadata",
+                file=sys.stderr,
+            )
+            continue
+        rc = _add_one(
+            url, base_tags=base_tags, args=args, cfg=cfg, auto_tags=auto_tags,
+        )
+        if rc == 0:
+            succeeded += 1
+        else:
+            failed += 1
+
+    print(
+        f"nostos add --from-owner {owner}: "
+        f"{succeeded} added, {failed} failed (of {len(repos)} matched).",
+        file=sys.stderr,
+    )
+    return 1 if failed and not succeeded else 0
+
+
+def run(args: argparse.Namespace) -> int:
+    maybe_migrate_watchlist()
+    cfg = load_config()
+
+    from_owner = getattr(args, "from_owner", None)
+    if from_owner:
+        if args.target:
+            return fail(
+                "--from-owner and a positional PATH_OR_URL are mutually "
+                "exclusive."
+            )
+        return _run_from_owner(args, cfg)
+
+    if not args.target:
+        return fail(
+            "missing PATH_OR_URL. Pass a local path / URL, or use "
+            "--from-owner OWNER for bulk ingest."
+        )
+
+    base_tags = _flatten_tags(args.tag)
+    auto_tags = _resolve_auto_tags(getattr(args, "auto_tags", None), cfg)
+    return _add_one(
+        args.target,
+        base_tags=base_tags,
+        args=args,
+        cfg=cfg,
+        auto_tags=auto_tags,
+    )

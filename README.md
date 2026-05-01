@@ -158,6 +158,12 @@ nostos triage
 # Ingest with auto-fetched repo topics from the upstream host (requires auth.toml)
 nostos add https://github.com/r4ulcl/Mythic-OSEP-CheatSheet --tag osep,c2 --auto-tags
 
+# Bulk-ingest every public repo of a GitHub user / org (requires auth.toml)
+nostos add --from-owner projectdiscovery --tag recon --auto-tags
+nostos add --from-owner tomnomnom --tag hacks --auto-tags --lang go --limit 20
+nostos add --from-owner orgname --tag c2 --auto-tags \
+    --include-forks --match '^(mythic|caldera)' --clone-dir ~/repos
+
 # Backfill topics across the whole fleet on the next refresh
 nostos refresh --all --auto-tags
 

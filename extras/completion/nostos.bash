@@ -31,7 +31,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--dry-run --fetch-only --rebase --depth --workers --timeout --exclude --from-index --watchlist --json -q --quiet -h --help" -- "$cur"))
             ;;
         add)
-            COMPREPLY=($(compgen -W "--tag --source --note --status --quiet-upstream --auto-tags --clone-dir -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--tag --source --note --status --quiet-upstream --auto-tags --clone-dir --from-owner --include-forks --include-archived --limit --match --lang -h --help" -- "$cur"))
             ;;
         list)
             COMPREPLY=($(compgen -W "--tag --status --untouched-over --upstream-archived --upstream-dormant --upstream-stale --json -h --help" -- "$cur"))
