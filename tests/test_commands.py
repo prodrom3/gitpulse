@@ -319,6 +319,17 @@ class TestTag(_IndexTestCase):
         with index.connect(self.db) as conn:
             self.assertEqual(index.get_tags(conn, "/t/a"), ["new"])
 
+    def test_tag_tilde_prefix_removes(self):
+        # ~tag is the argparse-safe remove prefix (no '--' separator needed).
+        with index.connect(self.db) as conn:
+            index.add_repo(conn, "/t/a", tags=["sheatsheet", "keep"])
+        args = argparse.Namespace(target="/t/a", tags=["~sheatsheet", "+cheatsheet"])
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_tag.run(args)
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            self.assertEqual(sorted(index.get_tags(conn, "/t/a")), ["cheatsheet", "keep"])
+
     def test_tag_missing_repo(self):
         args = argparse.Namespace(target="/nope", tags=["x"])
         with mock.patch("sys.stderr", new_callable=io.StringIO):

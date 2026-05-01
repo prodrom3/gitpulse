@@ -1,7 +1,13 @@
 """`nostos tag` - add / remove tags on a repository.
 
-Tags prefixed with `+` are added; tags prefixed with `-` are removed.
-A bare tag (no prefix) is treated as an add.
+Syntax:
+- `+tag` or bare `tag` adds.
+- `~tag` or `-tag` removes.
+
+`~` is the recommended remove prefix because it is not parsed as
+an option flag by argparse. `-tag` still works but only when the
+tag list is preceded by the `--` end-of-options separator, e.g.
+`nostos tag /repo -- -old +new`.
 """
 
 from __future__ import annotations
@@ -18,10 +24,13 @@ def add_parser(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "tag",
         help="Add or remove tags on a repository",
-        description="Edit tags: +tag adds, -tag removes, bare tag adds.",
+        description=(
+            "Edit tags: '+tag' or bare 'tag' adds; '~tag' (or '-tag' "
+            "after '--') removes."
+        ),
     )
     p.add_argument("target", metavar="PATH_OR_ID")
-    p.add_argument("tags", nargs="+", metavar="+TAG|-TAG|TAG")
+    p.add_argument("tags", nargs="+", metavar="+TAG|~TAG|TAG")
     p.set_defaults(func=run)
 
 
@@ -34,7 +43,7 @@ def _split(tag_args: list[str]) -> tuple[list[str], list[str]]:
             continue
         if t.startswith("+"):
             to_add.append(t[1:])
-        elif t.startswith("-"):
+        elif t.startswith("~") or t.startswith("-"):
             to_remove.append(t[1:])
         else:
             to_add.append(t)
