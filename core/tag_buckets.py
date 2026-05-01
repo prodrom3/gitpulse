@@ -72,6 +72,7 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "virtual-host", "virtual-hosts", "vhost", "vhosts",
             "domains", "endpoints", "subdomain-finder",
             "massdns", "information-gathering", "osint",
+            "cms", "gf-patterns",
         }),
     ),
     (
@@ -90,6 +91,7 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "verification", "dast", "static-analysis",
             "dynamic-analysis", "precommit",
             "secret-management", "secrets-management",
+            "cheatsheet", "detection",
         }),
     ),
     (
@@ -109,7 +111,7 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "greenbone", "gvm", "mitre", "mitre-attack",
             "mitre-corporation", "pegasus", "nso", "paybag",
             "lazyscript", "xposedornot", "customtkinter", "exiftool",
-            "exif", "radar",
+            "exif", "radar", "nmap", "atomic", "atomic-red-team",
         }),
     ),
     (
@@ -141,7 +143,17 @@ BUCKETS: tuple[tuple[str, frozenset[str]], ...] = (
             "open-source", "ping", "netcat", "cidr-notation", "service-discovery",
             "discovery-service", "secret-rotation", "ssh",
             "devsecops", "dev-tools", "automation", "fingerprint",
-            "ruby",
+            "ruby", "crypto", "grep", "web",
+        }),
+    ),
+    (
+        "desktop-env",
+        frozenset({
+            "dotfiles", "nord", "wayland", "sway", "voice",
+            "i3", "hyprland", "awesome", "awesomewm", "polybar",
+            "gnome", "kde", "xfce", "x11", "tmux", "neovim", "vim",
+            "zsh", "bash", "fish", "starship", "kitty", "alacritty",
+            "wezterm",
         }),
     ),
 )
@@ -170,6 +182,7 @@ DISPLAY_ORDER: tuple[str, ...] = (
     "project-name",
     "language",
     "os",
+    "desktop-env",
     "tech",
     "other",
 )

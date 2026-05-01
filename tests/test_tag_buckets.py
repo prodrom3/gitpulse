@@ -30,7 +30,22 @@ class TestBucketFor(unittest.TestCase):
 
     def test_unknown_falls_through_to_other(self):
         self.assertEqual(bucket_for("totally-made-up-tag-name-xyz"), "other")
-        self.assertEqual(bucket_for("nord"), "other")  # dotfiles theme - intentional
+
+    def test_known_desktop_env(self):
+        for tag in ("dotfiles", "nord", "wayland", "sway", "i3", "hyprland", "tmux"):
+            self.assertEqual(bucket_for(tag), "desktop-env", tag)
+
+    def test_175_additions_categorized(self):
+        # Tags moved out of `other` in 1.4.7. Spot-check each bucket.
+        self.assertEqual(bucket_for("nmap"), "project-name")
+        self.assertEqual(bucket_for("atomic"), "project-name")
+        self.assertEqual(bucket_for("cheatsheet"), "tool-kind")
+        self.assertEqual(bucket_for("detection"), "tool-kind")
+        self.assertEqual(bucket_for("cms"), "recon-technique")
+        self.assertEqual(bucket_for("gf-patterns"), "recon-technique")
+        self.assertEqual(bucket_for("crypto"), "tech")
+        self.assertEqual(bucket_for("grep"), "tech")
+        self.assertEqual(bucket_for("web"), "tech")
 
     def test_case_insensitive(self):
         self.assertEqual(bucket_for("XSS"), "attack-class")

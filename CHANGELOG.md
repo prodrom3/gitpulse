@@ -11,6 +11,22 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.4.7] - 2026-05-01
+
+### Added
+
+- `core/tag_buckets.py` gains a new `desktop-env` bucket (between `os` and `tech` in display order) covering common dotfiles topics: `dotfiles`, `nord`, `wayland`, `sway`, `voice`, plus future-proofing for `i3`, `hyprland`, `awesome`, `polybar`, `gnome`, `kde`, `xfce`, `x11`, `tmux`, `neovim`, `vim`, `zsh`, `bash`, `fish`, `starship`, `kitty`, `alacritty`, `wezterm`.
+
+### Changed
+
+- `core/tag_buckets.py`: 9 tags relocated from `other` into the appropriate higher-signal bucket so `nostos tags --grouped` puts every common security-tooling tag in a sensible home.
+  - `nmap`, `atomic` (and `atomic-red-team`) -> `project-name`.
+  - `cheatsheet`, `detection` -> `tool-kind`.
+  - `cms`, `gf-patterns` -> `recon-technique`.
+  - `crypto`, `grep`, `web` -> `tech`.
+
+  Net effect on a typical offensive-security fleet: `[other]` shrinks to almost-empty, and each grouped section becomes a richer, more useful index.
+
 ## [1.4.6] - 2026-05-01
 
 ### Added
