@@ -55,6 +55,15 @@ def auth_config_path() -> str:
     return os.path.join(config_dir(), "auth.toml")
 
 
+def topic_rules_path() -> str:
+    """Path to the optional topic curation file (TOML).
+
+    Drives the deny / alias rules applied when --auto-tags imports
+    upstream repo topics into the local tag list.
+    """
+    return os.path.join(config_dir(), "topic_rules.toml")
+
+
 def _ensure_dir(path: str, mode: int = 0o700) -> str:
     """Create a directory with restrictive perms if missing.
 

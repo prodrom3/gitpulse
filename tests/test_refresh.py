@@ -268,10 +268,33 @@ class TestRefreshAutoTags(_IndexTestCase):
         data = json.loads(out.getvalue())
         self.assertEqual(data["tags_added"], 3)
         self.assertEqual(len(data["tagged_repos"]), 1)
+        # Topics are normalized (lowercased / deduped) by topic_rules.apply
+        # before the diff against existing tags.
         self.assertEqual(
             sorted(data["tagged_repos"][0]["added"]),
-            ["Mythic", "c2", "redteam"],
+            ["c2", "mythic", "redteam"],
         )
+
+    def test_auto_tags_applies_topic_rules(self):
+        from core.topic_rules import TopicRules
+
+        rid = self._seed_repo(tags=["existing"])
+        meta = self._meta(topics=["foo", "red-teaming", "c2", "existing"])
+        rules = TopicRules(deny=["foo"], alias={"red-teaming": "redteam"})
+
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=meta
+        ), mock.patch(
+            "core.commands.refresh.load_topic_rules", return_value=rules
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            cmd_refresh.run(_refresh_args(auto_tags=True, all=True))
+        with index.connect(self.db) as conn:
+            tags = index.get_tags(conn, rid)
+        # 'foo' denied, 'red-teaming' aliased to 'redteam', 'existing' deduped.
+        self.assertEqual(sorted(tags), ["c2", "existing", "redteam"])
 
     def test_auto_tags_skipped_for_quiet_repo(self):
         with index.connect(self.db) as conn:

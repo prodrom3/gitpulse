@@ -16,6 +16,7 @@ from typing import Any
 from .. import index as _index
 from ..auth import load_auth
 from ..config import load_config
+from ..topic_rules import load_rules as load_topic_rules
 from ..upstream import (
     HostNotAllowed,
     ProbeError,
@@ -137,7 +138,9 @@ def _fetch_upstream_topics(remote_url: str) -> list[str]:
         return []
 
     topics = meta.get("topics") or []
-    return [str(t) for t in topics if isinstance(t, str)]
+    raw = [str(t) for t in topics if isinstance(t, str)]
+    rules = load_topic_rules()
+    return rules.apply(raw)
 
 
 def _resolve_auto_tags(cli_value: bool | None, cfg: dict[str, Any]) -> bool:

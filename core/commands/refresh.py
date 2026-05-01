@@ -24,6 +24,7 @@ from typing import Any
 
 from .. import index as _index
 from ..auth import load_auth
+from ..topic_rules import load_rules as load_topic_rules
 from ..upstream import (
     HostNotAllowed,
     ProbeError,
@@ -248,11 +249,21 @@ def _merge_topic_tags(
 ) -> list[str]:
     """Add upstream topics as tags on a repo. Returns the list of tags
     that were actually new (i.e. not already attached). Existing tags
-    are never removed."""
+    are never removed.
+
+    Topic rules (deny / alias) are applied before the diff against the
+    repo's current tags, so a freshly-aliased topic that already exists
+    on the repo under its canonical form is correctly recognised as
+    not-new.
+    """
     if not topics:
         return []
+    rules = load_topic_rules()
+    curated = rules.apply([t for t in topics if isinstance(t, str)])
+    if not curated:
+        return []
     existing = {t.lower() for t in _index.get_tags(conn, repo_id)}
-    new_tags = [t for t in topics if isinstance(t, str) and t.lower() not in existing]
+    new_tags = [t for t in curated if t.lower() not in existing]
     if new_tags:
         _index.add_tags(conn, repo_id, new_tags)
     return new_tags

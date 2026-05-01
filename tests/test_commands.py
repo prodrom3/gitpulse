@@ -141,11 +141,15 @@ class TestAdd(_IndexTestCase):
 
         fake_meta = {"topics": ["c2", "redteam", "Mythic"]}
 
+        from core.topic_rules import TopicRules
         with mock.patch("core.commands.add.clone_repo", return_value=cloned), \
              mock.patch("core.commands.add.probe_upstream", return_value=fake_meta), \
              mock.patch(
                  "core.commands.add.load_auth",
                  return_value=mock.Mock(is_allowed=lambda h: True),
+             ), mock.patch(
+                 "core.commands.add.load_topic_rules",
+                 return_value=TopicRules(),
              ):
             args = argparse.Namespace(
                 target="https://github.com/u/repo.git",
@@ -164,6 +168,43 @@ class TestAdd(_IndexTestCase):
             rows = index.list_repos(conn)
         # Topics merged, lowercased, deduplicated against existing tag.
         self.assertEqual(sorted(rows[0]["tags"]), ["c2", "existing", "mythic", "redteam"])
+
+    def test_auto_tags_applies_topic_rules(self):
+        clone_dir = os.path.join(self.tmp, "clones")
+        os.makedirs(clone_dir)
+        cloned = os.path.join(clone_dir, "repo")
+        os.makedirs(os.path.join(cloned, ".git"))
+
+        # Upstream returns a junk topic and a synonym; rules should drop / collapse.
+        fake_meta = {"topics": ["foo", "red-teaming", "c2"]}
+
+        from core.topic_rules import TopicRules
+        rules = TopicRules(deny=["foo"], alias={"red-teaming": "redteam"})
+        with mock.patch("core.commands.add.clone_repo", return_value=cloned), \
+             mock.patch("core.commands.add.probe_upstream", return_value=fake_meta), \
+             mock.patch(
+                 "core.commands.add.load_auth",
+                 return_value=mock.Mock(is_allowed=lambda h: True),
+             ), mock.patch(
+                 "core.commands.add.load_topic_rules",
+                 return_value=rules,
+             ):
+            args = argparse.Namespace(
+                target="https://github.com/u/repo.git",
+                tag=[],
+                source=None,
+                note=None,
+                status="new",
+                quiet_upstream=False,
+                auto_tags=True,
+                clone_dir=clone_dir,
+            )
+            rc = cmd_add.run(args)
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            rows = index.list_repos(conn)
+        # 'foo' denied, 'red-teaming' aliased to 'redteam', 'c2' kept.
+        self.assertEqual(sorted(rows[0]["tags"]), ["c2", "redteam"])
 
     def test_auto_tags_skipped_when_quiet_upstream(self):
         clone_dir = os.path.join(self.tmp, "clones")
