@@ -162,7 +162,7 @@ def save_rules(rules: TopicRules, path: str | None = None) -> str:
     else:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
-    body = _format_toml(rules)
+    body = dump_rules(rules)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(body)
@@ -175,7 +175,43 @@ def save_rules(rules: TopicRules, path: str | None = None) -> str:
     return path
 
 
-def _format_toml(rules: TopicRules) -> str:
+def parse_rules_from_text(text: str) -> TopicRules:
+    """Parse a TOML rules document from a string.
+
+    Used for `nostos topics import` where the source is a file path
+    the user passed explicitly (or stdin). Skips the owned-by-user /
+    not-world-writable checks that load_rules() applies to the
+    canonical config-dir file, since the caller has already chosen
+    to trust the source.
+
+    Raises ValueError on malformed TOML.
+    """
+    if _toml is None:
+        raise ValueError("no TOML parser available on this Python")
+    try:
+        data = _toml.loads(text)
+    except _toml.TOMLDecodeError as e:
+        raise ValueError(f"parse error: {e}") from None
+    deny_raw = data.get("deny", [])
+    alias_raw = data.get("alias", {})
+    deny = deny_raw if isinstance(deny_raw, list) else []
+    alias = alias_raw if isinstance(alias_raw, dict) else {}
+    return TopicRules(deny=deny, alias=alias)
+
+
+def merge_rules(base: TopicRules, incoming: TopicRules) -> TopicRules:
+    """Return a new TopicRules with deny = base.deny union incoming.deny
+    and alias = base.alias overlaid with incoming.alias (incoming wins
+    on conflict)."""
+    merged_alias: dict[str, str] = dict(base.alias)
+    merged_alias.update(incoming.alias)
+    return TopicRules(
+        deny=sorted(base.deny | incoming.deny),
+        alias=merged_alias,
+    )
+
+
+def dump_rules(rules: TopicRules) -> str:
     """Serialize a TopicRules to TOML.
 
     Hand-rolled to keep nostos zero-dep; the schema is small and fixed
@@ -210,4 +246,11 @@ def _escape(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-__all__ = ["TopicRules", "load_rules", "save_rules"]
+__all__ = [
+    "TopicRules",
+    "load_rules",
+    "save_rules",
+    "parse_rules_from_text",
+    "dump_rules",
+    "merge_rules",
+]

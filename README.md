@@ -167,6 +167,12 @@ nostos topics alias penetration-testing pentest
 nostos topics list
 nostos refresh --all --auto-tags         # re-curate the fleet
 
+# Share rules across machines or with colleagues
+nostos topics export > team-rules.toml
+nostos topics import team-rules.toml             # default: merge with local rules
+nostos topics import team-rules.toml --replace   # overwrite local rules
+curl -sS https://example.com/rules.toml | nostos topics import -   # via stdin
+
 # Find C2 tools you haven't touched in 90 days
 nostos list --tag c2 --untouched-over 90
 

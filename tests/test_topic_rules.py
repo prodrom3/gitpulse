@@ -6,7 +6,14 @@ import os
 import tempfile
 import unittest
 
-from core.topic_rules import TopicRules, load_rules, save_rules
+from core.topic_rules import (
+    TopicRules,
+    dump_rules,
+    load_rules,
+    merge_rules,
+    parse_rules_from_text,
+    save_rules,
+)
 
 
 class TestApply(unittest.TestCase):
@@ -97,6 +104,59 @@ class TestSaveLoadRoundTrip(unittest.TestCase):
         save_rules(rules, path=self.path)
         loaded = load_rules(self.path)
         self.assertEqual(loaded.alias, {'has"quote': 'with\\backslash'})
+
+
+class TestParseFromText(unittest.TestCase):
+    def test_parses_inline_string(self):
+        text = """
+deny = ["foo", "bar"]
+
+[alias]
+"red-teaming" = "redteam"
+"""
+        rules = parse_rules_from_text(text)
+        self.assertEqual(rules.deny, {"foo", "bar"})
+        self.assertEqual(rules.alias, {"red-teaming": "redteam"})
+
+    def test_malformed_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            parse_rules_from_text("this is = = not toml")
+
+
+class TestDumpRules(unittest.TestCase):
+    def test_dump_round_trip_through_parse(self):
+        rules = TopicRules(deny=["foo"], alias={"x": "y"})
+        text = dump_rules(rules)
+        round_tripped = parse_rules_from_text(text)
+        self.assertEqual(round_tripped.deny, {"foo"})
+        self.assertEqual(round_tripped.alias, {"x": "y"})
+
+    def test_empty_rules_dump_is_valid_toml(self):
+        text = dump_rules(TopicRules())
+        rules = parse_rules_from_text(text)
+        self.assertEqual(rules.deny, set())
+        self.assertEqual(rules.alias, {})
+
+
+class TestMergeRules(unittest.TestCase):
+    def test_deny_is_unioned(self):
+        a = TopicRules(deny=["foo", "bar"])
+        b = TopicRules(deny=["baz", "foo"])
+        merged = merge_rules(a, b)
+        self.assertEqual(merged.deny, {"foo", "bar", "baz"})
+
+    def test_alias_overlays_incoming_wins(self):
+        a = TopicRules(alias={"src": "old", "keep": "this"})
+        b = TopicRules(alias={"src": "new"})
+        merged = merge_rules(a, b)
+        self.assertEqual(merged.alias, {"src": "new", "keep": "this"})
+
+    def test_does_not_mutate_inputs(self):
+        a = TopicRules(deny=["foo"], alias={"x": "y"})
+        b = TopicRules(deny=["bar"], alias={"a": "b"})
+        merge_rules(a, b)
+        self.assertEqual(a.deny, {"foo"})
+        self.assertEqual(b.deny, {"bar"})
 
 
 if __name__ == "__main__":

@@ -117,6 +117,8 @@ _nostos() {
                         'allow:Remove topics from the deny list'
                         'alias:Rewrite SRC to DST during topic import'
                         'unalias:Remove alias entries by source name'
+                        'export:Write rules as TOML to PATH or stdout'
+                        'import:Load a rules TOML; merge or replace'
                     )
                     _arguments '1:subcommand:->topics_sub' '*::topics_arg:->topics_args'
                     case $state in
@@ -124,7 +126,11 @@ _nostos() {
                             _describe 'topics subcommand' topics_subs
                             ;;
                         topics_args)
-                            _arguments '--json[JSON output]'
+                            _arguments \
+                                '--json[JSON output]' \
+                                '--merge[Union deny lists, overlay alias maps]' \
+                                '--replace[Replace the local rules]' \
+                                '*:file:_files'
                             ;;
                     esac
                     ;;
