@@ -22,11 +22,8 @@ class _RulesTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.rules_path = os.path.join(self.tmp, "topic_rules.toml")
-        # Both modules look up the path via paths.topic_rules_path,
-        # but each imports it under a different name.
         self._patches = [
             mock.patch("core.topic_rules.topic_rules_path", return_value=self.rules_path),
-            mock.patch("core.topic_rules.config_dir", return_value=self.tmp),
             mock.patch("core.topic_rules.ensure_config_dir", return_value=self.tmp),
         ]
         for p in self._patches:
@@ -191,7 +188,6 @@ class _IndexAndRulesTestCase(unittest.TestCase):
         self.db = os.path.join(self.tmp, "index.db")
         self._patches = [
             mock.patch("core.topic_rules.topic_rules_path", return_value=self.rules_path),
-            mock.patch("core.topic_rules.config_dir", return_value=self.tmp),
             mock.patch("core.topic_rules.ensure_config_dir", return_value=self.tmp),
             mock.patch("core.index.index_db_path", return_value=self.db),
             mock.patch("core.index.ensure_data_dir", return_value=self.tmp),

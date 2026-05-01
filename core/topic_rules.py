@@ -34,7 +34,7 @@ import stat
 import sys
 from typing import Any
 
-from .paths import config_dir, ensure_config_dir, topic_rules_path
+from .paths import ensure_config_dir, topic_rules_path
 
 # Python 3.11+ ships tomllib; on 3.10 we fall back to tomli if installed.
 _toml: Any = None
