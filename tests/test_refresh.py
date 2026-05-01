@@ -46,6 +46,8 @@ def _refresh_args(**overrides):
         "force": False,
         "offline": False,
         "auto_tags": False,
+        "cves": False,
+        "workers": 1,  # default to serial in tests; parallel paths covered explicitly
         "json": False,
     }
     base.update(overrides)
@@ -314,6 +316,36 @@ class TestRefreshAutoTags(_IndexTestCase):
         mock_probe.assert_not_called()
         with index.connect(self.db) as conn:
             self.assertEqual(index.get_tags(conn, rid), [])
+
+
+class TestRefreshParallel(_IndexTestCase):
+    def test_workers_8_refreshes_every_repo(self):
+        # Seed 12 repos so a worker pool of 8 actually parallelizes.
+        with index.connect(self.db) as conn:
+            for i in range(12):
+                index.add_repo(
+                    conn, f"/t/r{i}",
+                    remote_url=f"git@github.com:o/r{i}.git", source="test",
+                )
+        meta = {
+            "provider": "github", "host": "github.com", "owner": "o", "name": "r",
+            "stars": 1, "archived": False, "default_branch": "main",
+            "last_push": "2026-04-10T00:00:00Z",
+            "fetched_at": "2026-04-15T00:00:00+00:00",
+        }
+        with mock.patch(
+            "core.commands.refresh.load_auth",
+            return_value=AuthConfig(hosts={"github.com": {}}),
+        ), mock.patch(
+            "core.commands.refresh.probe_upstream", return_value=meta
+        ), mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_refresh.run(_refresh_args(all=True, workers=8))
+        self.assertEqual(rc, 0)
+        with index.connect(self.db) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM upstream_meta"
+            ).fetchone()[0]
+        self.assertEqual(count, 12)
 
 
 class TestListUpstreamFilters(_IndexTestCase):

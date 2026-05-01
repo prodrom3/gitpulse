@@ -107,6 +107,7 @@ nostos is verb-first: `nostos <verb> [args]`. An invocation without a verb is an
 | `show` | Print full metadata for one repo. |
 | `tag` | Add or remove tags on a repo. |
 | `tags` | List every tag in the index with attachment counts; optionally prune orphans. |
+| `search` | Free-text search across paths, tags, notes, and upstream descriptions. |
 | `note` | Append a timestamped note. |
 | `triage` | Walk newly-added repos interactively and classify them. |
 | `refresh` | Fetch upstream metadata. Opsec-gated. See [docs/upstream-probes.md](docs/upstream-probes.md). |
@@ -175,6 +176,14 @@ nostos list --license MIT,Apache-2.0          # only permissively-licensed repos
 nostos list --license-not GPL-3.0,AGPL-3.0    # reject copyleft for our product
 nostos list --upstream-cve                    # repos with at least one open advisory
 nostos list --upstream-severity high          # high+ severity only
+
+# Refresh and curate concurrently for a big fleet
+nostos refresh --all --cves --workers 8       # ~10s for 60 repos vs ~60s serial
+nostos topics apply --workers 8
+
+# Free-text search when you don't remember the exact tag
+nostos search "csrf bypass"                   # matches notes, descriptions, paths
+nostos search projectdiscovery --json | jq '.repositories[].path'
 
 # Backfill topics across the whole fleet on the next refresh
 nostos refresh --all --auto-tags

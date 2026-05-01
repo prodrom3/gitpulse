@@ -11,6 +11,7 @@ verbs=(
     'add:Register a repository in the metadata index'
     'list:List repositories in the metadata index'
     'show:Show full metadata for a single repository'
+    'search:Free-text search across paths, tags, notes, descriptions'
     'tag:Add or remove tags on a repository'
     'tags:List every tag in the index with attachment counts'
     'note:Append a note to a repository'
@@ -94,6 +95,12 @@ _nostos() {
                 show)
                     _arguments '--json[JSON output]' '1:target:'
                     ;;
+                search)
+                    _arguments \
+                        '--limit[Cap to first N matches]:n:' \
+                        '--json[JSON output]' \
+                        '1:query:'
+                    ;;
                 tag)
                     _arguments '1:target:' '*:tags:'
                     ;;
@@ -127,6 +134,7 @@ _nostos() {
                         '--offline[No network]' \
                         '--auto-tags[Merge upstream topics into tag list]' \
                         '--cves[Also fetch GitHub Security Advisories]' \
+                        '--workers[Concurrent probe workers]:n:' \
                         '--json[JSON output]'
                     ;;
                 topics)

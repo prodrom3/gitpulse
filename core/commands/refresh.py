@@ -18,9 +18,11 @@ the opsec guarantee documented in README > Security.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime
 import logging
 import sys
+import threading
 from typing import Any
 
 from .. import index as _index
@@ -92,6 +94,16 @@ def add_parser(subparsers: Any) -> None:
         "main probe; gated by the same auth.toml allowlist.",
     )
     p.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Concurrent probe workers (default: 4). Set to 1 to "
+        "refresh serially. Each worker uses its own DB connection; "
+        "GitHub rate limits are enforced via the existing "
+        "Retry-After / X-RateLimit-Remaining handling.",
+    )
+    p.add_argument(
         "--json",
         action="store_true",
         help="Emit a JSON summary instead of human-readable lines",
@@ -141,50 +153,59 @@ def run(args: argparse.Namespace) -> int:
     failed = 0
     errors: list[dict[str, Any]] = []
     tagged_repos: list[dict[str, Any]] = []  # populated when --auto-tags is on
+    counters_lock = threading.Lock()
 
-    for repo in targets:
+    def _refresh_one(repo: dict[str, Any]) -> None:
+        nonlocal refreshed, skipped_quiet, skipped_unauthorised, failed
         path = repo["path"]
         # Opsec: quiet repos are NEVER probed. Do not even log the path
         # at info level; debug only.
         if repo.get("quiet"):
-            skipped_quiet += 1
+            with counters_lock:
+                skipped_quiet += 1
             logging.debug("nostos refresh: skipping quiet repo")
-            continue
+            return
 
         remote_url = repo.get("remote_url")
         if not remote_url:
-            failed += 1
-            errors.append({"path": path, "error": "no remote_url recorded"})
-            continue
+            with counters_lock:
+                failed += 1
+                errors.append({"path": path, "error": "no remote_url recorded"})
+            return
 
         parsed = parse_remote_url(remote_url)
         if parsed is None:
-            failed += 1
-            errors.append({"path": path, "error": f"unparseable remote: {remote_url}"})
-            continue
+            with counters_lock:
+                failed += 1
+                errors.append({"path": path, "error": f"unparseable remote: {remote_url}"})
+            return
         host, _, _ = parsed
 
         if not auth.is_allowed(host):
-            skipped_unauthorised += 1
+            with counters_lock:
+                skipped_unauthorised += 1
             logging.debug(f"nostos refresh: host {host} not in auth.toml, skipping")
-            continue
+            return
 
         if args.offline:
             logging.info(f"nostos refresh: (offline) would refresh {path} from {host}")
-            continue
+            return
 
         try:
             meta = probe_upstream(remote_url, auth, offline=False)
         except HostNotAllowed:
-            skipped_unauthorised += 1
-            continue
+            with counters_lock:
+                skipped_unauthorised += 1
+            return
         except ProviderUnknown as e:
-            failed += 1
-            errors.append({"path": path, "error": f"provider unknown: {e}"})
-            continue
+            with counters_lock:
+                failed += 1
+                errors.append({"path": path, "error": f"provider unknown: {e}"})
+            return
         except ProbeError as e:
-            failed += 1
-            errors.append({"path": path, "error": str(e)})
+            with counters_lock:
+                failed += 1
+                errors.append({"path": path, "error": str(e)})
             # Record the error so subsequent `show` can see why it failed.
             try:
                 with _index.connect() as conn:
@@ -197,7 +218,7 @@ def run(args: argparse.Namespace) -> int:
                     _index.upsert_upstream_meta(conn, repo["id"], existing)
             except OSError:
                 pass
-            continue
+            return
 
         if getattr(args, "cves", False):
             owner_for_cve = meta.get("owner") or ""
@@ -213,8 +234,6 @@ def run(args: argparse.Namespace) -> int:
                         datetime.timezone.utc
                     ).isoformat(timespec="seconds")
                 except ProbeHTTPError as e:
-                    # 404 here is unusual but means the repo went away
-                    # between the main probe and the advisory call.
                     logging.debug(f"nostos refresh: cve fetch HTTP {e.status} for {path}")
                 except ProbeError as e:
                     logging.debug(f"nostos refresh: cve fetch failed for {path}: {e}")
@@ -223,13 +242,29 @@ def run(args: argparse.Namespace) -> int:
             with _index.connect() as conn:
                 _index.upsert_upstream_meta(conn, repo["id"], meta)
                 if args.auto_tags:
-                    new_tags = _merge_topic_tags(conn, repo["id"], meta.get("topics") or [])
-                    if new_tags:
-                        tagged_repos.append({"path": path, "added": new_tags})
-            refreshed += 1
+                    new_tags = _merge_topic_tags(
+                        conn, repo["id"], meta.get("topics") or []
+                    )
+                else:
+                    new_tags = []
+            with counters_lock:
+                refreshed += 1
+                if new_tags:
+                    tagged_repos.append({"path": path, "added": new_tags})
         except OSError as e:
-            failed += 1
-            errors.append({"path": path, "error": f"index write failed: {e}"})
+            with counters_lock:
+                failed += 1
+                errors.append({"path": path, "error": f"index write failed: {e}"})
+
+    workers = max(1, int(getattr(args, "workers", 4) or 1))
+    if workers == 1 or len(targets) <= 1:
+        for repo in targets:
+            _refresh_one(repo)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_refresh_one, repo) for repo in targets]
+            for fut in concurrent.futures.as_completed(futures):
+                fut.result()  # surface any unexpected exception
 
     summary = {
         "targets": len(targets),

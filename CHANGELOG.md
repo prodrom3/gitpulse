@@ -11,6 +11,22 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.6.1] - 2026-05-01
+
+### Added
+
+- **`nostos search QUERY`**: case-insensitive substring search across repo paths, remote URLs, source provenance, attached tag names, note bodies, and upstream descriptions. OR semantics across fields. Useful when you don't remember the exact tag - "what was that CSRF tool again?". Backed by a SQLite LIKE query (no FTS5 schema migration needed at the current fleet sizes). New `core.index.search_repos(conn, query, *, limit=None)` helper. `--limit N` and `--json` flags. 14 new tests.
+- **Parallel `nostos refresh`** with `--workers N` (default `4`). Probes run concurrently across worker threads; index writes use the existing per-connection threading lock so SQLite writers serialise cleanly. ~6x speedup on a 60-repo fleet with `--cves`.
+- **Parallel `nostos topics apply`** with `--workers N` (default `4`). Each worker computes the per-repo tag diff and writes its tag changes against its own DB connection. Same speedup profile as refresh on big fleets.
+- **Doctor health-check expansions** (`nostos doctor`):
+  - `orphan_tags`: tag rows with zero `repo_tags` references (cosmetic; cleaned by `nostos tags --prune-orphans`).
+  - `quiet_no_remote`: repos marked `quiet=1` that have no `remote_url`. They will never refresh - useful to flag and decide whether to drop or fix.
+  - `topic_rules`: `~/.config/nostos/topic_rules.toml` parses cleanly (or is missing entirely, which is fine). Reports deny / alias counts; flags malformed TOML with the parse error.
+  - `auth_perms`: `~/.config/nostos/auth.toml` exists with safe perms on Unix (owned by current user, not group/world readable or writable). Flagged with the exact `chmod 600` fix.
+  - `unconfigured_hosts`: hosts that show up in fleet remotes but aren't allow-listed in `auth.toml`. Refresh / `--auto-tags` will silently fail-closed for those repos. Skipped entirely when `auth.toml` is missing - if the operator never set up auth, flagging every repo would be noise.
+
+VERSION 1.6.0 -> 1.6.1. Semver PATCH: additive (one new command, two new flags, expanded doctor checks); fully backwards-compatible.
+
 ## [1.6.0] - 2026-05-01
 
 ### Added

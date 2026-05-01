@@ -97,6 +97,81 @@ class TestDoctorChecks(_IndexTestCase):
         self.assertEqual(report["schema_version"], index.CURRENT_SCHEMA_VERSION)
 
 
+class TestDoctor16Checks(_IndexTestCase):
+    """1.6.1 expansions: orphan_tags, quiet_no_remote, topic_rules,
+    auth_perms, unconfigured_hosts."""
+
+    def test_orphan_tags_flagged(self):
+        with index.connect(self.db) as conn:
+            rid = index.add_repo(conn, "/t/a", tags=["sole"])
+            index.remove_tags(conn, rid, ["sole"])
+            report = _doctor.run_checks(conn)
+        self.assertIn("sole", report["orphan_tags"])
+
+    def test_quiet_no_remote_flagged(self):
+        with index.connect(self.db) as conn:
+            index.add_repo(conn, "/t/a", quiet=True)  # no remote_url
+            report = _doctor.run_checks(conn)
+        self.assertEqual(len(report["quiet_no_remote"]), 1)
+
+    def test_unconfigured_hosts_skipped_when_auth_toml_missing(self):
+        # Simulate "no auth.toml at all" - the most common fresh-install
+        # case. The check should not fire.
+        with mock.patch("core.doctor.auth_config_path", return_value="/no/such/file"):
+            with index.connect(self.db) as conn:
+                index.add_repo(conn, "/t/a", remote_url="git@github.com:o/r.git")
+                report = _doctor.run_checks(conn)
+        self.assertEqual(report["unconfigured_hosts"], [])
+
+    def test_unconfigured_hosts_flagged_when_auth_toml_present(self):
+        # Pretend auth.toml exists but doesn't allow github.com.
+        from core.auth import AuthConfig
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".toml", delete=False
+        ) as f:
+            f.write("[hosts.\"gitlab.com\"]\ntoken_env = \"GL\"\n")
+            auth_path = f.name
+        try:
+            # `load_auth` is imported lazily inside _check_unconfigured_hosts,
+            # so patch it at its source module:
+            with mock.patch("core.doctor.auth_config_path", return_value=auth_path), \
+                 mock.patch("core.auth.load_auth",
+                            return_value=AuthConfig(hosts={"gitlab.com": {}})):
+                with index.connect(self.db) as conn:
+                    index.add_repo(conn, "/t/a", remote_url="git@github.com:o/r.git")
+                    index.add_repo(conn, "/t/b", remote_url="git@github.com:o/q.git")
+                    report = _doctor.run_checks(conn)
+            self.assertEqual(len(report["unconfigured_hosts"]), 1)
+            self.assertEqual(report["unconfigured_hosts"][0]["host"], "github.com")
+            self.assertEqual(report["unconfigured_hosts"][0]["repos"], 2)
+        finally:
+            os.unlink(auth_path)
+
+    def test_topic_rules_ok_when_missing(self):
+        with mock.patch("core.doctor.topic_rules_path", return_value="/no/such/file"):
+            with index.connect(self.db) as conn:
+                report = _doctor.run_checks(conn)
+        self.assertTrue(report["topic_rules"]["ok"])
+        self.assertEqual(report["topic_rules"]["deny"], 0)
+        self.assertEqual(report["topic_rules"]["alias"], 0)
+
+    def test_topic_rules_flags_malformed(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".toml", delete=False
+        ) as f:
+            f.write("not = = valid toml\n")
+            bad_path = f.name
+        try:
+            with mock.patch("core.doctor.topic_rules_path", return_value=bad_path), \
+                 mock.patch("core.topic_rules.topic_rules_path", return_value=bad_path):
+                with index.connect(self.db) as conn:
+                    report = _doctor.run_checks(conn)
+            self.assertFalse(report["topic_rules"]["ok"])
+            self.assertIsNotNone(report["topic_rules"]["error"])
+        finally:
+            os.unlink(bad_path)
+
+
 class TestDoctorFix(_IndexTestCase):
     def test_fix_flags_stale_repos(self):
         with index.connect(self.db) as conn:

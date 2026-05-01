@@ -217,7 +217,7 @@ class TestTopicsApply(_IndexAndRulesTestCase):
             return _index.add_repo(conn, path, tags=list(tags))
 
     def _args(self, **overrides):
-        base = {"repo": None, "dry_run": False, "json": False}
+        base = {"repo": None, "dry_run": False, "workers": 1, "json": False}
         base.update(overrides)
         return argparse.Namespace(**base)
 
@@ -303,6 +303,20 @@ class TestTopicsApply(_IndexAndRulesTestCase):
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             rc = cmd_topics.run_apply(self._args(repo="/nope"))
         self.assertEqual(rc, 1)
+
+    def test_apply_workers_8_against_many_repos(self):
+        self._seed_rules(deny=["foo"], alias={"red-teaming": "redteam"})
+        # 12 repos, each with one tag that needs rewriting + one denied tag.
+        rids = []
+        for i in range(12):
+            rids.append(self._seed_repo(f"/t/r{i}", tags=["foo", "red-teaming"]))
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            rc = cmd_topics.run_apply(self._args(workers=8))
+        self.assertEqual(rc, 0)
+        # All 12 repos should now have just `redteam`, no `foo` or `red-teaming`.
+        with _index.connect(self.db) as conn:
+            for rid in rids:
+                self.assertEqual(_index.get_tags(conn, rid), ["redteam"])
 
 
 if __name__ == "__main__":

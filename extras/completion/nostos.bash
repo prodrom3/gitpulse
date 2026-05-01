@@ -7,7 +7,7 @@ _nostos() {
     local cur prev words cword
     _init_completion || return
 
-    local verbs="pull add list show tag tags note triage rm refresh topics digest vault export import update"
+    local verbs="pull add list search show tag tags note triage rm refresh topics digest vault export import update"
     local vault_subs="export sync"
     local statuses="new reviewed in-use dropped flagged"
 
@@ -39,6 +39,9 @@ _nostos() {
         show)
             COMPREPLY=($(compgen -W "--json -h --help" -- "$cur"))
             ;;
+        search)
+            COMPREPLY=($(compgen -W "--limit --json -h --help" -- "$cur"))
+            ;;
         tag)
             COMPREPLY=($(compgen -W "-h --help" -- "$cur"))
             ;;
@@ -55,7 +58,7 @@ _nostos() {
             COMPREPLY=($(compgen -W "--purge --cleanup-vault --yes -h --help" -- "$cur"))
             ;;
         refresh)
-            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --cves --json -h --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--repo --since --all --force --offline --auto-tags --cves --workers --json -h --help" -- "$cur"))
             ;;
         topics)
             local topics_sub="${words[2]:-}"
@@ -75,7 +78,7 @@ _nostos() {
                 import)
                     COMPREPLY=($(compgen -W "--merge --replace -h --help" -f -- "$cur")) ;;
                 apply)
-                    COMPREPLY=($(compgen -W "--repo --dry-run --json -h --help" -- "$cur")) ;;
+                    COMPREPLY=($(compgen -W "--repo --dry-run --workers --json -h --help" -- "$cur")) ;;
             esac
             ;;
         digest)

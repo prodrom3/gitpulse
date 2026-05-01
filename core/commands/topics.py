@@ -19,7 +19,9 @@ state on already-indexed repos when the rules change.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import sys
+import threading
 from typing import Any
 
 from .. import index as _index
@@ -141,6 +143,14 @@ def add_parser(subparsers: Any) -> None:
         "--dry-run",
         action="store_true",
         help="Print what would change but do not modify the index",
+    )
+    apl.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Concurrent workers for the per-repo diff + tag-write "
+        "(default: 4). Set to 1 to apply serially.",
     )
     apl.add_argument(
         "--json",
@@ -341,21 +351,25 @@ def run_apply(args: argparse.Namespace) -> int:
     changed: list[dict[str, Any]] = []
     total_removed = 0
     total_added = 0
+    counters_lock = threading.Lock()
+    write_error: list[str] = []  # captured under counters_lock
 
-    for repo in targets:
+    def _apply_one(repo: dict[str, Any]) -> None:
+        nonlocal total_removed, total_added
         current = repo.get("tags") or []
         to_remove, to_add = _diff_tags(current, rules)
         if not to_remove and not to_add:
-            continue
-        changed.append({
-            "path": repo["path"],
-            "removed": to_remove,
-            "added": to_add,
-        })
-        total_removed += len(to_remove)
-        total_added += len(to_add)
+            return
+        with counters_lock:
+            changed.append({
+                "path": repo["path"],
+                "removed": to_remove,
+                "added": to_add,
+            })
+            total_removed += len(to_remove)
+            total_added += len(to_add)
         if args.dry_run:
-            continue
+            return
         try:
             with _index.connect() as conn:
                 if to_remove:
@@ -363,7 +377,26 @@ def run_apply(args: argparse.Namespace) -> int:
                 if to_add:
                     _index.add_tags(conn, repo["id"], to_add)
         except OSError as e:
-            return fail(f"index write failed for {repo['path']}: {e}")
+            with counters_lock:
+                write_error.append(f"index write failed for {repo['path']}: {e}")
+
+    workers = max(1, int(getattr(args, "workers", 4) or 1))
+    if workers == 1 or len(targets) <= 1:
+        for repo in targets:
+            _apply_one(repo)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_apply_one, repo) for repo in targets]
+            for fut in concurrent.futures.as_completed(futures):
+                fut.result()
+
+    if write_error:
+        # Surface the first write failure with a non-zero exit; subsequent
+        # ones are informative but non-fatal so the operator gets to see
+        # the partial state.
+        for msg in write_error[1:]:
+            print(f"nostos topics apply: {msg}", file=sys.stderr)
+        return fail(write_error[0])
 
     if args.json:
         import json as _json

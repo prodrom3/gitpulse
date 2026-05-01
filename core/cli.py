@@ -30,6 +30,7 @@ from .commands import note as _cmd_note
 from .commands import pull as _cmd_pull
 from .commands import refresh as _cmd_refresh
 from .commands import rm as _cmd_rm
+from .commands import search as _cmd_search
 from .commands import show as _cmd_show
 from .commands import tag as _cmd_tag
 from .commands import tags as _cmd_tags
@@ -43,7 +44,7 @@ _KNOWN_VERBS: frozenset[str] = frozenset(
         "pull", "add", "list", "show", "tag", "tags", "note", "triage",
         "rm", "refresh", "digest", "vault", "export", "import",
         "update", "doctor", "attack", "dashboard", "completion",
-        "topics",
+        "topics", "search",
     }
 )
 
@@ -112,6 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     _cmd_add.add_parser(subparsers)
     # Index inspection & editing:
     _cmd_list.add_parser(subparsers)
+    _cmd_search.add_parser(subparsers)
     _cmd_show.add_parser(subparsers)
     _cmd_tag.add_parser(subparsers)
     _cmd_tags.add_parser(subparsers)

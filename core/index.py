@@ -563,6 +563,59 @@ def get_tags(conn: sqlite3.Connection, selector: str | int) -> list[str]:
     return _get_tags_for_repo(conn, repo_id)
 
 
+def search_repos(
+    conn: sqlite3.Connection,
+    query: str,
+    *,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Full-text-ish search across paths, remote URLs, tag names,
+    note bodies, and upstream descriptions.
+
+    Returns matching repos in newest-first order. Empty / whitespace-
+    only queries return []. Matching is case-insensitive substring
+    via SQLite LIKE - good enough at <10000 repos and avoids the
+    schema migration of an FTS5 virtual table.
+
+    Note: SQLite LIKE is case-insensitive only for ASCII. That's
+    fine: tag names are lowercased on write, and the other fields
+    rarely benefit from non-ASCII case folding in the security
+    tooling space.
+    """
+    needle = query.strip()
+    if not needle:
+        return []
+    pattern = f"%{needle}%"
+
+    sql = """
+        SELECT DISTINCT r.* FROM repos r
+        LEFT JOIN upstream_meta u ON u.repo_id = r.id
+        LEFT JOIN repo_tags rt ON rt.repo_id = r.id
+        LEFT JOIN tags t ON t.id = rt.tag_id
+        LEFT JOIN notes n ON n.repo_id = r.id
+        WHERE
+            r.path LIKE ? COLLATE NOCASE OR
+            r.remote_url LIKE ? COLLATE NOCASE OR
+            r.source LIKE ? COLLATE NOCASE OR
+            t.name LIKE ? COLLATE NOCASE OR
+            n.body LIKE ? COLLATE NOCASE OR
+            u.description LIKE ? COLLATE NOCASE
+        ORDER BY r.added_at DESC, r.id DESC
+    """
+    params: list[Any] = [pattern] * 6
+    if limit is not None and limit > 0:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+
+    rows = conn.execute(sql, params).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        repo = _row_to_dict(row)
+        repo["tags"] = _get_tags_for_repo(conn, int(row["id"]))
+        out.append(repo)
+    return out
+
+
 def list_tags_with_counts(
     conn: sqlite3.Connection, *, include_orphans: bool = False
 ) -> list[tuple[str, int]]:
