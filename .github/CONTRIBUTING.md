@@ -80,7 +80,7 @@ python nostos.py pull --dry-run /path/to/scratch
 1. Fork and branch off `master`. Name your branch after the change: `portable/schema-v3`, `fix/clone-timeout-on-windows`.
 2. Keep PRs scoped. If a PR mixes unrelated changes, it will be asked to split.
 3. Include tests for new behaviour and regression tests for fixes.
-4. Update [CHANGELOG.md](CHANGELOG.md) under the `[Unreleased]` section.
+4. Update [CHANGELOG.md](../CHANGELOG.md) under the `[Unreleased]` section.
 5. Update the README and `docs/` if you change user-visible behaviour.
 6. Run the local lint / mypy / test loop before pushing.
 7. Open the PR against `master`. CI runs on push and pull_request; all three jobs (lint, type-check, test matrix) must be green.

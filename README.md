@@ -31,7 +31,7 @@
 | **Network posture** | Fail-closed. Hosts not listed in `~/.config/nostos/auth.toml` are never contacted, ever. `--offline` is a global kill switch. |
 | **Supply chain** | PyPI releases built and published via GitHub Actions OIDC trusted publishing (no static API tokens). Hardened clone path mitigates CVE-2024-32002 / 32004 / 32465. |
 | **Versioning** | Strict [SemVer](https://semver.org/) 2.0; full per-release rationale in [CHANGELOG.md](CHANGELOG.md). |
-| **Maintainers** | See [MAINTAINERS.md](MAINTAINERS.md). Vulnerability disclosure: [SECURITY.md](SECURITY.md). |
+| **Maintainers** | See [MAINTAINERS.md](MAINTAINERS.md). Vulnerability disclosure: [SECURITY.md](.github/SECURITY.md). |
 
 ---
 
@@ -408,7 +408,7 @@ nostos treats git operations on untrusted working directories as an attack surfa
 | Per-repo quiet flag | `add --quiet-upstream` makes a repo ineligible for upstream probes; the probe layer never queries or logs these repos. |
 | Token hygiene | Tokens sourced from env vars by default, sent as `Authorization: Bearer`, redacted from every log and error path. |
 
-Report security issues privately via a [GitHub security advisory](https://github.com/prodrom3/nostos/security/advisories/new). See [SECURITY.md](SECURITY.md) for the full disclosure process.
+Report security issues privately via a [GitHub security advisory](https://github.com/prodrom3/nostos/security/advisories/new). See [SECURITY.md](.github/SECURITY.md) for the full disclosure process.
 
 ---
 
@@ -448,9 +448,9 @@ Response expectations (best-effort, non-commercial): see [MAINTAINERS.md](MAINTA
 | File | Purpose |
 | --- | --- |
 | [CHANGELOG.md](CHANGELOG.md) | Per-release change log (mirrors GitHub releases). |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, test / lint / mypy workflow, PR style. |
+| [CONTRIBUTING.md](.github/CONTRIBUTING.md) | Dev setup, test / lint / mypy workflow, PR style. |
 | [MAINTAINERS.md](MAINTAINERS.md) | Primary maintainer, escalation path, release authority. |
-| [SECURITY.md](SECURITY.md) | Private disclosure process. |
+| [SECURITY.md](.github/SECURITY.md) | Private disclosure process. |
 | [LICENSE](LICENSE) | MIT. |
 
 Deep-dive docs under [`docs/`](docs/):

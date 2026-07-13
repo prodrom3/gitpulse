@@ -13,7 +13,7 @@
 ## Escalation path
 
 1. **Bugs, feature requests:** open a GitHub issue at https://github.com/prodrom3/nostos/issues
-2. **Security issues:** follow the private disclosure process in [SECURITY.md](SECURITY.md). Do not file public issues for vulnerabilities.
+2. **Security issues:** follow the private disclosure process in [SECURITY.md](.github/SECURITY.md). Do not file public issues for vulnerabilities.
 3. **Merge conflicts or build infrastructure:** mention the primary maintainer on the relevant PR or issue.
 
 ## Release authority
