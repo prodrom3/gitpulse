@@ -134,8 +134,11 @@ _INIT_LOCK = threading.Lock()
 
 
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
+    # journal_mode is a persistent, on-disk property of the database, so
+    # it is set once when the file is created (see connect()) rather than
+    # on every connection. busy_timeout, secure_delete, and foreign_keys
+    # are per-connection and must be re-applied each time.
     conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA secure_delete = ON")
     conn.execute("PRAGMA foreign_keys = ON")
 
@@ -192,17 +195,35 @@ def connect(path: str | None = None) -> Iterator[sqlite3.Connection]:
         ensure_data_dir()
         path = index_db_path()
     is_new = not os.path.exists(path)
+    if is_new and sys.platform != "win32":
+        # Create the file with 0600 BEFORE sqlite opens it, so there is
+        # no window where the database (or its WAL/-shm sidecars, which
+        # sqlite creates with the same mode as the main file) is briefly
+        # world-readable under the process umask.
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            is_new = False
+        except OSError:
+            pass
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
-        if is_new:
-            _chmod_0600(path)
         # Serialize PRAGMA + schema setup across threads. Without this,
         # `nostos add --from-owner --workers N` races on the initial
         # WAL setup and on schema_version checks.
         with _INIT_LOCK:
             _apply_pragmas(conn)
+            if is_new:
+                conn.execute("PRAGMA journal_mode = WAL")
             _ensure_schema(conn)
+        if is_new:
+            # Belt-and-braces: re-assert 0600 on the file and its WAL/-shm
+            # sidecars in case the pre-create above was skipped.
+            _chmod_0600(path)
+            _chmod_0600(path + "-wal")
+            _chmod_0600(path + "-shm")
         yield conn
     finally:
         conn.close()
@@ -280,8 +301,10 @@ def add_repo(
             params.append(source)
         if updates:
             params.append(repo_id)
+            # nosec B608: `updates` holds only fixed "col = ?" fragments;
+            # every value is bound through params, never interpolated.
             conn.execute(
-                f"UPDATE repos SET {', '.join(updates)} WHERE id = ?", params
+                f"UPDATE repos SET {', '.join(updates)} WHERE id = ?", params  # nosec B608
             )
     else:
         cur = conn.execute(
@@ -585,15 +608,9 @@ def _get_tags_for_repos(
         return out
     for chunk in _chunked(list(repo_ids)):
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"""
-            SELECT rt.repo_id, t.name FROM tags t
-            JOIN repo_tags rt ON rt.tag_id = t.id
-            WHERE rt.repo_id IN ({placeholders})
-            ORDER BY t.name
-            """,
-            chunk,
-        ).fetchall()
+        # `placeholders` is only '?' characters; chunk values are bound.
+        sql = f"SELECT rt.repo_id, t.name FROM tags t JOIN repo_tags rt ON rt.tag_id = t.id WHERE rt.repo_id IN ({placeholders}) ORDER BY t.name"  # nosec B608
+        rows = conn.execute(sql, chunk).fetchall()
         for row in rows:
             out[int(row["repo_id"])].append(row["name"])
     return out
@@ -613,10 +630,9 @@ def get_upstream_meta_batch(
         return out
     for chunk in _chunked(list(repo_ids)):
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"SELECT * FROM upstream_meta WHERE repo_id IN ({placeholders})",
-            chunk,
-        ).fetchall()
+        # `placeholders` is only '?' characters; chunk values are bound.
+        sql = f"SELECT * FROM upstream_meta WHERE repo_id IN ({placeholders})"  # nosec B608
+        rows = conn.execute(sql, chunk).fetchall()
         for row in rows:
             out[int(row["repo_id"])] = _row_to_dict(row)
     return out
@@ -635,14 +651,9 @@ def get_notes_batch(
         return out
     for chunk in _chunked(list(repo_ids)):
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"""
-            SELECT * FROM notes
-            WHERE repo_id IN ({placeholders})
-            ORDER BY created_at ASC, id ASC
-            """,
-            chunk,
-        ).fetchall()
+        # `placeholders` is only '?' characters; chunk values are bound.
+        sql = f"SELECT * FROM notes WHERE repo_id IN ({placeholders}) ORDER BY created_at ASC, id ASC"  # nosec B608
+        rows = conn.execute(sql, chunk).fetchall()
         for row in rows:
             out[int(row["repo_id"])].append(_row_to_dict(row))
     return out

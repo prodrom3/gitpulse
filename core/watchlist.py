@@ -54,13 +54,21 @@ def _safe_clone_env() -> dict[str, str]:
 
     Mitigates CVE-2024-32002, CVE-2024-32004, CVE-2024-32465 where
     malicious repos can execute arbitrary code via hooks during clone.
+
+    Also pins the dangerous git transports rather than trusting the
+    user's global config: the `ext::` transport runs an arbitrary
+    command and could turn a hostile clone URL into code execution, so
+    we force it off (never) even if the caller's ~/.gitconfig re-enabled
+    it. `file` is left at git's default (user).
     """
     env = os.environ.copy()
-    env["GIT_CONFIG_COUNT"] = "2"
+    env["GIT_CONFIG_COUNT"] = "3"
     env["GIT_CONFIG_KEY_0"] = "core.hooksPath"
     env["GIT_CONFIG_VALUE_0"] = "/dev/null"
     env["GIT_CONFIG_KEY_1"] = "protocol.file.allow"
     env["GIT_CONFIG_VALUE_1"] = "user"
+    env["GIT_CONFIG_KEY_2"] = "protocol.ext.allow"
+    env["GIT_CONFIG_VALUE_2"] = "never"
     return env
 
 
@@ -70,7 +78,22 @@ def clone_repo(url: str, clone_dir: str, timeout: int = 120) -> str | None:
     Uses --no-checkout to prevent hook execution during clone, then
     checks out in a second step. Hooks are disabled via environment
     variables as defense-in-depth against CVE-2024-32002/32004/32465.
+
+    The URL is validated against the remote-URL allowlist first: callers
+    such as bundle import pass through untrusted input, and an
+    unvalidated string could be a git option (`--upload-pack=...`,
+    `-c protocol...`) or a dangerous transport (`ext::sh -c ...`) rather
+    than a clone target. Anything that is not a recognised http(s)/ssh/
+    git URL is refused.
     """
+    if not is_remote_url(url):
+        print(
+            f"Error: refusing to clone non-URL remote {url!r} "
+            "(expected an http(s), ssh, or git:// URL)",
+            file=sys.stderr,
+        )
+        return None
+
     repo_name = extract_repo_name(url)
     target = os.path.join(clone_dir, repo_name)
 
@@ -90,9 +113,11 @@ def clone_repo(url: str, clone_dir: str, timeout: int = 120) -> str | None:
 
     print(f"Cloning {url} into {target}...")
     try:
-        # Phase 1: clone without checkout (no hooks fire)
+        # Phase 1: clone without checkout (no hooks fire). The `--`
+        # separator stops a URL that begins with `-` from being parsed
+        # as a git option.
         subprocess.run(
-            ["git", "clone", "--no-checkout", url, target],
+            ["git", "clone", "--no-checkout", "--", url, target],
             check=True,
             capture_output=True,
             text=True,
@@ -134,9 +159,10 @@ def _is_watchlist_safe(path: str) -> bool:
             f"Ignoring {path}: owned by uid {st.st_uid}, not current user"
         )
         return False
-    if st.st_mode & stat.S_IWOTH:
+    if st.st_mode & (stat.S_IWOTH | stat.S_IWGRP):
         logging.warning(
-            f"Ignoring {path}: world-writable (fix with: chmod o-w {path})"
+            f"Ignoring {path}: group- or world-writable "
+            f"(fix with: chmod go-w {path})"
         )
         return False
     return True

@@ -11,6 +11,35 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.7.0] - 2026-07-13
+
+### Security
+
+- **Hardened the clone path against argument and transport injection.** `core.watchlist.clone_repo` now validates its URL against the remote-URL allowlist before running git, passes `--` before the positional arguments so a URL beginning with `-` cannot be parsed as a git option, and pins `protocol.ext.allow=never` in the clone environment rather than trusting the caller's global git config. This closes an exposure on the bundle-import path, which passes untrusted `remote_url` values straight through: a hostile bundle could otherwise smuggle a git option (`--upload-pack=...`, `-c ...`) or a dangerous transport (`ext::sh -c ...`, `file://`) into `git clone`.
+- **The metadata index and its WAL sidecars are now genuinely `0600`.** The database file is created with `0600` before SQLite opens it (previously it was chmod'd only after `sqlite3.connect` had already created it under the process umask), and the `-wal` / `-shm` sidecars, which carry not-yet-checkpointed rows, are tightened to `0600` as well. This makes the "mode `0600`" posture accurate on shared hosts.
+- **`nostos update --verify` is now fail-closed.** A release tag whose signature does not verify aborts the upgrade unconditionally. `--yes` (which only skips the confirm prompt) no longer doubles as an override for a failed signature check; to upgrade without checking signatures, omit `--verify`.
+- **Credential headers are stripped on cross-host redirects.** A new `core.http_safe` installs a process-wide opener whose redirect handler drops `Authorization` and `Cookie` when a redirect crosses to a different host, so an `Authorization: Bearer <token>` destined for a configured host cannot be forwarded to a redirect target on another host. Applied to both the upstream probe layer and the self-update release check.
+- **Upstream probe URLs are constrained to https.** The probe HTTP helper refuses any non-https URL before issuing a request, so a token is never attached to a plaintext or non-network scheme.
+- **Tightened config / watchlist permission checks.** `.nostosrc` and `.nostos_repos` are now rejected when group-writable as well as world-writable, matching the stricter check already applied to `auth.toml`.
+
+### Changed
+
+- **Removed a wasted HTTP round-trip from every GitLab probe.** `GitLabProbe.fetch` previously issued a releases request that always failed (list vs object shape), discarded it, then issued the identical request a second time. It now makes a single request through the shared list helper.
+- **De-duplicated the probe HTTP helpers.** `_http_get_json` and `_http_get_json_list` now share a single `_http_get` implementation that performs the request and JSON parse once; each wrapper only asserts the expected JSON shape.
+- **`journal_mode = WAL` is set once at database creation** instead of on every connection, since it is a persistent on-disk property. The per-connection pragmas (`busy_timeout`, `secure_delete`, `foreign_keys`) are unchanged.
+
+### CI / supply chain
+
+- New `security` job runs `bandit -ll` (static analysis) and `pip-audit --strict` (dependency vulnerability audit) on every push and pull request.
+- The PyPI publish step now emits PEP 740 provenance attestations, and the workflow documents the recommendation to pin third-party actions to commit SHAs.
+- `argcomplete` gained an upper version bound (`>=3.0,<4`).
+
+### Tests
+
+- New and updated tests covering: clone URL rejection and the `--` separator, the `protocol.ext.allow=never` pin, DB and WAL sidecar `0600` permissions, the fail-closed `--verify` path, cross-host credential stripping (`tests/test_http_safe.py`), and group-writable config / watchlist rejection.
+
+VERSION 1.6.3 -> 1.7.0. Semver MINOR: adds fail-closed behaviour to `nostos update --verify` and new defensive rejections on the clone and probe paths. No breaking changes to public commands or output; the only behaviour change is that a failed `--verify` now aborts instead of prompting for override.
+
 ## [1.6.3] - 2026-05-01
 
 ### Changed

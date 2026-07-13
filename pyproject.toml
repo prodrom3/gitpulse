@@ -30,7 +30,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "argcomplete>=3.0",
+    # Upper bound guards against an unvetted future major that could ship
+    # a breaking change into an environment that installs nostos loosely.
+    "argcomplete>=3.0,<4",
 ]
 
 [project.scripts]

@@ -21,6 +21,11 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from .http_safe import install_safe_opener
+
+# Strip credential headers on cross-host redirects for the release check.
+install_safe_opener()
+
 _RELEASES_URL: str = "https://api.github.com/repos/prodrom3/nostos/releases/latest"
 
 
@@ -47,7 +52,8 @@ def fetch_latest_release(
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        # _RELEASES_URL is a fixed https api.github.com endpoint.
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             body = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         raise UpdateError(f"GitHub API returned {e.code}") from None

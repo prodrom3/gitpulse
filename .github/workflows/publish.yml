@@ -1,5 +1,9 @@
 name: Publish to PyPI
 
+# Hardening note: the third-party actions below are pinned to major-version
+# / branch tags for readability. For a stricter supply-chain posture, pin
+# each `uses:` to a full commit SHA and bump via Dependabot.
+
 on:
   push:
     tags:
@@ -69,3 +73,6 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Emit PEP 740 provenance attestations for the uploaded artifacts.
+          attestations: true

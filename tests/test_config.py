@@ -110,6 +110,12 @@ class TestConfigSafety(unittest.TestCase):
         self.assertFalse(_is_config_safe(path))
 
     @unittest.skipIf(sys.platform == "win32", "Unix-only ownership check")
+    def test_rejects_group_writable(self):
+        path = self._write_config("[defaults]\nworkers = 4\n")
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IWGRP)
+        self.assertFalse(_is_config_safe(path))
+
+    @unittest.skipIf(sys.platform == "win32", "Unix-only ownership check")
     def test_rejects_wrong_owner(self):
         path = self._write_config("[defaults]\n")
         with mock.patch("os.stat") as mock_stat:

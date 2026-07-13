@@ -106,10 +106,35 @@ class TestCloneRepo(unittest.TestCase):
         # Two calls: clone --no-checkout, then checkout
         self.assertEqual(mock_run.call_count, 2)
         clone_cmd = mock_run.call_args_list[0][0][0]
-        self.assertEqual(clone_cmd, ["git", "clone", "--no-checkout",
+        self.assertEqual(clone_cmd, ["git", "clone", "--no-checkout", "--",
                                      "https://github.com/user/repo.git", target])
         checkout_cmd = mock_run.call_args_list[1][0][0]
         self.assertEqual(checkout_cmd, ["git", "checkout"])
+
+    @mock.patch("core.watchlist.subprocess.run")
+    def test_rejects_non_url_remote(self, mock_run: mock.Mock) -> None:
+        # Untrusted callers (bundle import) must not be able to smuggle a
+        # git option or a dangerous transport through as a "URL".
+        for hostile in (
+            "--upload-pack=touch /tmp/x",
+            "-cprotocol.ext.allow=always",
+            "ext::sh -c 'id'",
+            "file:///etc",
+            "/local/path",
+        ):
+            with self.subTest(hostile=hostile):
+                self.assertIsNone(clone_repo(hostile, self.tmpdir))
+        mock_run.assert_not_called()
+
+    @mock.patch("core.watchlist.subprocess.run")
+    def test_clone_uses_double_dash_separator(self, mock_run: mock.Mock) -> None:
+        mock_run.return_value = subprocess.CompletedProcess([], 0, "", "")
+        clone_repo("https://github.com/user/repo.git", self.tmpdir)
+        clone_cmd = mock_run.call_args_list[0][0][0]
+        self.assertIn("--", clone_cmd)
+        # The URL must come after the -- separator.
+        self.assertLess(clone_cmd.index("--"), clone_cmd.index(
+            "https://github.com/user/repo.git"))
 
     @mock.patch("core.watchlist.subprocess.run")
     def test_clone_timeout(self, mock_run: mock.Mock) -> None:
@@ -154,9 +179,14 @@ class TestSafeCloneEnv(unittest.TestCase):
         self.assertEqual(env["GIT_CONFIG_KEY_1"], "protocol.file.allow")
         self.assertEqual(env["GIT_CONFIG_VALUE_1"], "user")
 
+    def test_disables_ext_protocol(self) -> None:
+        env = _safe_clone_env()
+        self.assertEqual(env["GIT_CONFIG_KEY_2"], "protocol.ext.allow")
+        self.assertEqual(env["GIT_CONFIG_VALUE_2"], "never")
+
     def test_sets_config_count(self) -> None:
         env = _safe_clone_env()
-        self.assertEqual(env["GIT_CONFIG_COUNT"], "2")
+        self.assertEqual(env["GIT_CONFIG_COUNT"], "3")
 
     def test_inherits_parent_env(self) -> None:
         env = _safe_clone_env()
@@ -214,6 +244,12 @@ class TestWatchlistSafety(unittest.TestCase):
     def test_rejects_world_writable(self) -> None:
         path = self._write_file("/tmp/repo\n")
         os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IWOTH)
+        self.assertFalse(_is_watchlist_safe(path))
+
+    @unittest.skipIf(sys.platform == "win32", "Unix-only ownership check")
+    def test_rejects_group_writable(self) -> None:
+        path = self._write_file("/tmp/repo\n")
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IWGRP)
         self.assertFalse(_is_watchlist_safe(path))
 
     def test_returns_true_on_windows(self) -> None:
