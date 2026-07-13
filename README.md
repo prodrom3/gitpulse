@@ -29,7 +29,7 @@
 | **Install** | `pipx install nostos`, `pip install nostos`, or `pip install -e .` from a clone |
 | **Storage** | Local SQLite at `$XDG_DATA_HOME/nostos/index.db` (mode `0600` on Unix). No telemetry, no remote service. |
 | **Network posture** | Fail-closed. Hosts not listed in `~/.config/nostos/auth.toml` are never contacted, ever. `--offline` is a global kill switch. |
-| **Supply chain** | PyPI releases built and published via GitHub Actions OIDC trusted publishing (no static API tokens). Hardened clone path mitigates CVE-2024-32002 / 32004 / 32465. |
+| **Supply chain** | PyPI releases via GitHub Actions OIDC trusted publishing (no static API tokens) with PEP 740 provenance attestations; third-party Actions are SHA-pinned and Dependabot-managed. Hardened clone path resists argument/transport injection and mitigates CVE-2024-32002 / 32004 / 32465. |
 | **Versioning** | Strict [SemVer](https://semver.org/) 2.0; full per-release rationale in [CHANGELOG.md](CHANGELOG.md). |
 | **Maintainers** | See [MAINTAINERS.md](MAINTAINERS.md). Vulnerability disclosure: [SECURITY.md](.github/SECURITY.md). |
 
@@ -396,10 +396,10 @@ nostos treats git operations on untrusted working directories as an attack surfa
 | Control | Description |
 | --- | --- |
 | Git version check | Startup warning on git < 2.45.1 (CVE-2024-32002 / 32004 / 32465). |
-| Safe remote clone | `add <url>` clones with `--no-checkout` and disables hooks via `GIT_CONFIG_*`. |
+| Safe remote clone | Clone paths (`add <url>`, import clone-on-import) validate the URL, pass `--` to git, pin `protocol.ext.allow=never`, clone with `--no-checkout`, and disable hooks via `GIT_CONFIG_*` - blocking option/transport injection plus CVE-2024-32002 / 32004 / 32465. |
 | Credential redaction | HTTPS credentials stripped from all logs and from `remote_url` values in the index. |
-| File permissions | Logs and index DB `0600`; config and data dirs `0700` (Unix). |
-| Ownership checks | `~/.nostosrc`, `auth.toml`, and legacy watchlist rejected if not owned by the invoking user or world-writable. |
+| File permissions | Logs, index DB, and its `-wal`/`-shm` sidecars `0600`; config and data dirs `0700` (Unix). |
+| Ownership checks | `~/.nostosrc`, `auth.toml`, and legacy watchlist rejected if not owned by the invoking user or if group- or world-writable. |
 | Repository ownership | Repos not owned by the current user are skipped on Unix. |
 | Symlink protection | The `logs/` directory is rejected if it is a symlink. |
 | No shell injection | Every subprocess call uses list arguments; `shell=True` is never used. |
@@ -407,6 +407,9 @@ nostos treats git operations on untrusted working directories as an attack surfa
 | Probe fail-closed | Upstream probes only contact hosts listed in `auth.toml`; `--offline` hard-disables the network layer. |
 | Per-repo quiet flag | `add --quiet-upstream` makes a repo ineligible for upstream probes; the probe layer never queries or logs these repos. |
 | Token hygiene | Tokens sourced from env vars by default, sent as `Authorization: Bearer`, redacted from every log and error path. |
+| Redirect / probe safety | Upstream probes are https-only; `Authorization` / `Cookie` headers are stripped on any cross-host redirect so a token cannot follow a redirect to another host. |
+| Self-update integrity | `update --verify` runs `git verify-tag` and refuses to upgrade on an unverifiable signature (fail-closed; not overridable by `--yes`). |
+| Build & release | OIDC trusted publishing with PEP 740 provenance attestations; third-party Actions SHA-pinned and Dependabot-managed; `bandit`, `pip-audit`, and CodeQL run in CI. |
 
 Report security issues privately via a [GitHub security advisory](https://github.com/prodrom3/nostos/security/advisories/new). See [SECURITY.md](.github/SECURITY.md) for the full disclosure process.
 
