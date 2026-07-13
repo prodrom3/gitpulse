@@ -2,10 +2,6 @@
 
 Thanks for considering a contribution. This guide covers the dev loop end to end: clone, set up, test, lint, type-check, open a PR.
 
-## Code of Conduct
-
-Participation in this project is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). By contributing, you agree to abide by it.
-
 ## Security issues
 
 Please **do not** file public GitHub issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for the private reporting channel.
