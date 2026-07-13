@@ -2,10 +2,6 @@
 
 Thanks for considering a contribution. This guide covers the dev loop end to end: clone, set up, test, lint, type-check, open a PR.
 
-## Code of Conduct
-
-Participation in this project is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). By contributing, you agree to abide by it.
-
 ## Security issues
 
 Please **do not** file public GitHub issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for the private reporting channel.
@@ -80,7 +76,7 @@ python nostos.py pull --dry-run /path/to/scratch
 1. Fork and branch off `master`. Name your branch after the change: `portable/schema-v3`, `fix/clone-timeout-on-windows`.
 2. Keep PRs scoped. If a PR mixes unrelated changes, it will be asked to split.
 3. Include tests for new behaviour and regression tests for fixes.
-4. Update [CHANGELOG.md](CHANGELOG.md) under the `[Unreleased]` section.
+4. Update [CHANGELOG.md](../CHANGELOG.md) under the `[Unreleased]` section.
 5. Update the README and `docs/` if you change user-visible behaviour.
 6. Run the local lint / mypy / test loop before pushing.
 7. Open the PR against `master`. CI runs on push and pull_request; all three jobs (lint, type-check, test matrix) must be green.
