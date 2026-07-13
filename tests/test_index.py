@@ -84,6 +84,20 @@ class TestConnectAndSchema(unittest.TestCase):
             mode = stat.S_IMODE(os.stat(db).st_mode)
             self.assertEqual(mode, 0o600)
 
+    @unittest.skipIf(sys.platform == "win32", "Unix-only perm check")
+    def test_wal_sidecar_is_0600(self):
+        # The -wal sidecar carries not-yet-checkpointed writes and must
+        # not be left world-readable alongside a 0600 main database.
+        with tempfile.TemporaryDirectory() as d:
+            db = os.path.join(d, "a.db")
+            with index.connect(db) as conn:
+                conn.execute("CREATE TABLE t (x)")
+                conn.commit()
+                wal = db + "-wal"
+                self.assertTrue(os.path.exists(wal))
+                mode = stat.S_IMODE(os.stat(wal).st_mode)
+                self.assertEqual(mode, 0o600)
+
 
 class TestRepoCrud(unittest.TestCase):
     def setUp(self):

@@ -263,6 +263,33 @@ class TestUpdateCommand(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Automatic upgrade is not supported", err.getvalue())
 
+    def test_failed_verify_aborts_even_with_yes(self):
+        # A signature that does not verify must abort the upgrade, and
+        # --yes must NOT override that (it only skips the confirm prompt).
+        run_upgrade = mock.Mock()
+        with mock.patch("core.commands._common.maybe_migrate_watchlist"), mock.patch(
+            "core.cli.get_version", return_value="2.3.0"
+        ), mock.patch(
+            "core.commands.update._self.detect_install_method",
+            return_value={
+                "method": "source", "source_dir": "/tmp/gp",
+                "upgrade_cmd": "git -C /tmp/gp pull --ff-only", "notes": "",
+            },
+        ), mock.patch(
+            "core.commands.update._self.fetch_latest_release",
+            return_value={"tag_name": "v2.4.0"},
+        ), mock.patch(
+            "core.commands.update._self.verify_release_tag",
+            return_value=(False, "BAD signature"),
+        ), mock.patch(
+            "core.commands.update._self.run_upgrade", run_upgrade,
+        ), mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+            "sys.stderr", new_callable=io.StringIO
+        ):
+            rc = cmd_update.run(self._args(verify=True, yes=True))
+        self.assertEqual(rc, 1)
+        run_upgrade.assert_not_called()
+
     def test_yes_skips_confirm(self):
         with mock.patch("core.commands._common.maybe_migrate_watchlist"), mock.patch(
             "core.cli.get_version", return_value="2.3.0"

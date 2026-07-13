@@ -31,6 +31,10 @@ import urllib.request
 from typing import Any, Protocol
 
 from .auth import AuthConfig
+from .http_safe import install_safe_opener
+
+# Strip credential headers on cross-host redirects for every probe.
+install_safe_opener()
 
 
 class _Probe(Protocol):
@@ -112,18 +116,25 @@ def parse_remote_url(url: str) -> tuple[str, str, str] | None:
 # ---------- provider probes ----------
 
 
-def _http_get_json(
+def _http_get(
     url: str,
     *,
     token: str | None = None,
     accept: str | None = None,
     timeout: float = 15.0,
-) -> tuple[dict[str, Any], dict[str, str]]:
-    """GET a URL and parse JSON. Returns (body, headers).
+) -> tuple[Any, dict[str, str]]:
+    """GET a URL and parse JSON. Returns (parsed, headers).
 
-    Raises ProbeHTTPError on HTTP 4xx/5xx, ProbeError on parse/timeout
-    failures. Never logs Authorization headers.
+    `parsed` is whatever JSON the endpoint returned (dict, list, ...);
+    the typed wrappers below assert the shape. Raises ProbeHTTPError on
+    HTTP 4xx/5xx, ProbeError on network/parse/timeout failures. Never
+    logs Authorization headers.
     """
+    # Enforce https so a token is never sent over a plaintext or
+    # non-network (file:/) scheme; api_base always builds https URLs.
+    if not url.lower().startswith("https://"):
+        raise ProbeError(f"refusing non-https upstream URL: {url!r}")
+
     req = urllib.request.Request(url, method="GET")
     req.add_header("User-Agent", "nostos")
     if accept:
@@ -135,7 +146,7 @@ def _http_get_json(
         req.add_header("Authorization", f"Bearer {token}")
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310: scheme constrained to https above
             headers = {k: v for k, v in resp.headers.items()}
             body = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
@@ -154,9 +165,20 @@ def _http_get_json(
         raise ProbeError(f"os error: {e}") from None
 
     try:
-        data = json.loads(body)
+        return json.loads(body), headers
     except json.JSONDecodeError as e:
         raise ProbeError(f"invalid JSON from upstream: {e}") from None
+
+
+def _http_get_json(
+    url: str,
+    *,
+    token: str | None = None,
+    accept: str | None = None,
+    timeout: float = 15.0,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """GET a URL and parse a JSON object response."""
+    data, headers = _http_get(url, token=token, accept=accept, timeout=timeout)
     if not isinstance(data, dict):
         raise ProbeError("unexpected JSON shape from upstream")
     return data, headers
@@ -169,40 +191,8 @@ def _http_get_json_list(
     accept: str | None = None,
     timeout: float = 15.0,
 ) -> tuple[list[Any], dict[str, str]]:
-    """Like `_http_get_json` but expects a list response.
-
-    Raises ProbeHTTPError on HTTP 4xx/5xx, ProbeError on parse/timeout
-    failures or unexpected (non-list) JSON shape.
-    """
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("User-Agent", "nostos")
-    if accept:
-        req.add_header("Accept", accept)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
-
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            headers = {k: v for k, v in resp.headers.items()}
-            body = resp.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        try:
-            body = e.read().decode("utf-8", errors="replace")
-        except OSError:
-            body = ""
-        msg = _short_http_message(body) or e.reason or ""
-        raise ProbeHTTPError(e.code, f"{e.code} {msg}") from None
-    except urllib.error.URLError as e:
-        raise ProbeError(f"network error: {e.reason}") from None
-    except TimeoutError:
-        raise ProbeError("timeout") from None
-    except OSError as e:
-        raise ProbeError(f"os error: {e}") from None
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        raise ProbeError(f"invalid JSON from upstream: {e}") from None
+    """GET a URL and parse a JSON array response."""
+    data, headers = _http_get(url, token=token, accept=accept, timeout=timeout)
     if not isinstance(data, list):
         raise ProbeError("unexpected JSON shape from upstream (expected list)")
     return data, headers
@@ -552,30 +542,18 @@ class GitLabProbe:
             "topics": _clean_topics(data.get("topics") or data.get("tag_list")),
         }
 
+        # Latest release. GitLab's /releases endpoint returns a JSON
+        # array (unlike GitHub's /releases/latest object), so use the
+        # list helper directly - a single request, no discarded probe.
         try:
-            rel, _ = _http_get_json(
+            items, _ = _http_get_json_list(
                 f"{base}/projects/{project}/releases?per_page=1", token=token
             )
-            # GitLab returns a list; but our _http_get_json demands a dict.
-            # Use a list-accepting fallback here.
-        except ProbeError:
-            pass
-
-        try:
-            req = urllib.request.Request(
-                f"{base}/projects/{project}/releases?per_page=1", method="GET"
-            )
-            req.add_header("User-Agent", "nostos")
-            if token:
-                req.add_header("Authorization", f"Bearer {token}")
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = resp.read().decode("utf-8", errors="replace")
-            items = json.loads(body)
-            if isinstance(items, list) and items:
+            if items and isinstance(items[0], dict):
                 tag = items[0].get("tag_name")
                 if tag:
                     result["latest_release"] = tag
-        except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        except ProbeError:
             pass
 
         return result

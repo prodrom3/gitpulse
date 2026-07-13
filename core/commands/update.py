@@ -56,7 +56,8 @@ def add_parser(subparsers: Any) -> None:
         action="store_true",
         help=(
             "Verify the release tag signature via `git verify-tag` "
-            "(requires GPG or SSH signing configured in your git; "
+            "before upgrading and refuse to upgrade if it does not "
+            "verify (requires GPG or SSH signing configured in your git; "
             "only meaningful for source-clone installs)."
         ),
     )
@@ -117,11 +118,15 @@ def run(args: argparse.Namespace) -> int:
             )
             if verify_out:
                 print(f"  {verify_out}", file=sys.stderr)
-            if not args.yes:
-                return fail(
-                    "tag signature verification failed; pass --yes to "
-                    "override and upgrade anyway"
-                )
+            # Fail closed: a signature that does not verify aborts the
+            # upgrade. --yes only skips the interactive confirm prompt; it
+            # must not double as an override for a failed signature check.
+            # To upgrade without checking signatures, re-run without
+            # --verify.
+            return fail(
+                "tag signature verification failed; refusing to upgrade. "
+                "Re-run without --verify to skip the signature check."
+            )
     elif getattr(args, "verify", False):
         print(
             "note: --verify is only meaningful for source-clone installs; "

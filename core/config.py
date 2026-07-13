@@ -30,9 +30,10 @@ def _is_config_safe(config_path: str) -> bool:
             f"Ignoring {config_path}: owned by uid {st.st_uid}, not current user"
         )
         return False
-    if st.st_mode & stat.S_IWOTH:
+    if st.st_mode & (stat.S_IWOTH | stat.S_IWGRP):
         logging.warning(
-            f"Ignoring {config_path}: world-writable (fix with: chmod o-w {config_path})"
+            f"Ignoring {config_path}: group- or world-writable "
+            f"(fix with: chmod go-w {config_path})"
         )
         return False
     return True
