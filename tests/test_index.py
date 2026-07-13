@@ -3,6 +3,7 @@ import sqlite3
 import stat
 import sys
 import tempfile
+import threading
 import unittest
 
 from core import index
@@ -83,6 +84,38 @@ class TestConnectAndSchema(unittest.TestCase):
                 pass
             mode = stat.S_IMODE(os.stat(db).st_mode)
             self.assertEqual(mode, 0o600)
+
+    def test_concurrent_connect_on_fresh_db_no_lock_error(self):
+        # Regression guard for the 1.7.0 "database is locked" race: many
+        # threads opening a brand-new index at once must all establish WAL
+        # cleanly. Each round uses a fresh DB and a barrier so all workers
+        # hit connect() together; repeating the round drives the odds of
+        # tripping the (fixed) race to effectively 1, so a reintroduction
+        # fails reliably rather than flakily.
+        errors: list[str] = []
+        rounds = 10
+        n = 12
+        for attempt in range(rounds):
+            with tempfile.TemporaryDirectory() as d:
+                db = os.path.join(d, "race.db")
+                barrier = threading.Barrier(n)
+
+                def worker(i: int, db: str = db, barrier: "threading.Barrier" = barrier,
+                           attempt: int = attempt) -> None:
+                    try:
+                        barrier.wait()
+                        with index.connect(db) as conn:
+                            index.add_repo(conn, f"/tmp/race-{attempt}-{i}")
+                    except Exception as e:  # noqa: BLE001 - record any failure
+                        errors.append(repr(e))
+
+                threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+
+        self.assertEqual(errors, [], f"concurrent connect raised: {errors}")
 
     @unittest.skipIf(sys.platform == "win32", "Unix-only perm check")
     def test_wal_sidecar_is_0600(self):

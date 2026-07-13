@@ -11,6 +11,14 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.7.1] - 2026-07-13
+
+### Fixed
+
+- **`sqlite3.OperationalError: database is locked` under concurrent connects.** 1.7.0 moved `PRAGMA journal_mode = WAL` to run only on the connection that creates the database. On a freshly created index this let a second worker thread (`nostos add --from-owner --workers N`, and the parallel clone path in `nostos import`) acquire the setup lock first and write schema in rollback-journal mode before WAL was established, after which the WAL flip failed because WAL setup does not honour `busy_timeout`. WAL is now re-asserted on every connection under `_INIT_LOCK` again (an idempotent no-op once active), restoring the pre-1.7.0 concurrency behaviour. The `0600` pre-creation of the database file and the `0600` tightening of the `-wal` / `-shm` sidecars from 1.7.0 are retained.
+
+VERSION 1.7.0 -> 1.7.1. Semver PATCH: fixes a concurrency regression introduced in 1.7.0; no public API or behaviour changes.
+
 ## [1.7.0] - 2026-07-13
 
 ### Security
