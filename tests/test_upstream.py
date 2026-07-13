@@ -291,5 +291,26 @@ class TestProbeUpstreamDispatcher(unittest.TestCase):
         self.assertEqual(result["stars"], 5)
 
 
+class TestHttpsOnlyGuard(unittest.TestCase):
+    def test_rejects_non_https_url(self):
+        from core.upstream import _http_get
+
+        for url in ("http://example.com/api", "file:///etc/passwd", "ftp://h/x"):
+            with self.subTest(url=url):
+                with self.assertRaises(ProbeError):
+                    _http_get(url)
+
+    def test_non_https_never_reaches_the_network(self):
+        # The scheme check must short-circuit before urlopen is called, so
+        # no token or request can leak to a plaintext/non-network scheme.
+        from core.upstream import _http_get
+
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=AssertionError("must not be called")
+        ):
+            with self.assertRaises(ProbeError):
+                _http_get("http://example.com/api", token="secret")
+
+
 if __name__ == "__main__":
     unittest.main()

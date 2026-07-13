@@ -755,5 +755,36 @@ class TestImportCommand(_IndexTestCase):
         self.assertEqual(sorted(repos[0]["tags"]), ["old"])
 
 
+class TestImportRejectsHostileRemote(_IndexTestCase):
+    def test_hostile_bundle_remote_url_is_not_cloned(self):
+        # An untrusted bundle must not be able to drive clone_repo into a
+        # git option or a dangerous transport. These entries never resolve
+        # locally, so import would try to clone them - and must refuse.
+        bundle = {
+            "schema": 2,
+            "repos": [
+                {"path": "/nonexistent/evil", "remote_url": "ext::sh -c 'id'",
+                 "status": "new", "tags": [], "notes": []},
+                {"path": "/nonexistent/opt", "remote_url": "--upload-pack=x",
+                 "status": "new", "tags": [], "notes": []},
+                {"path": "/nonexistent/file", "remote_url": "file:///etc",
+                 "status": "new", "tags": [], "notes": []},
+            ],
+        }
+        clone_dir = os.path.join(self.tmp, "clones")
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            with index.connect(self.db) as conn:
+                stats = portable.import_bundle(
+                    conn, bundle, clone_missing=True, clone_dir=clone_dir,
+                )
+        self.assertEqual(stats["cloned"], 0)
+        self.assertEqual(stats["clone_failed"], 3)
+        # Nothing hostile should have been written to disk under clone_dir.
+        self.assertFalse(
+            os.path.isdir(clone_dir) and os.listdir(clone_dir),
+            "hostile remotes must not create any clone directory",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

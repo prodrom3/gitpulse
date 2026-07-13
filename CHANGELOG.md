@@ -11,6 +11,23 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 
 No unreleased changes.
 
+## [1.7.2] - 2026-07-13
+
+### Security
+
+- **GitHub Actions are pinned to full commit SHAs** (with the human-readable tag in a trailing comment) across `ci.yml` and `publish.yml`, and a `.github/dependabot.yml` keeps the pins - and the `pip` dependency - current. Pinning removes the mutable-tag substitution risk; this matters most for `publish.yml`, whose action refs are not exercised by PR CI.
+
+### Documentation
+
+- **SECURITY.md corrected and refreshed.** The "Supported versions" table listed non-existent 2.x releases; it now reflects 1.7.x / 1.6.x. The threat model was updated to describe the 1.7.0/1.7.1 hardening: clone argument/transport-injection defense, group-writable config/watchlist rejection, fail-closed `--verify`, cross-host credential stripping, https-only probes, `0600` WAL sidecars, and the SHA-pinned / attested release pipeline.
+
+### Tests
+
+- `test_upstream.py`: the probe HTTP helper rejects non-https URLs and never reaches the network for them.
+- `test_portable.py`: an import bundle carrying hostile `remote_url` values (`ext::`, `--upload-pack=`, `file://`) is refused with zero clones and no directory created.
+
+VERSION 1.7.1 -> 1.7.2. Semver PATCH: supply-chain and documentation hardening plus test coverage; no public API or behaviour changes.
+
 ## [1.7.1] - 2026-07-13
 
 ### Fixed
