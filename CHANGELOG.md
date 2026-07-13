@@ -12,6 +12,7 @@ https://github.com/prodrom3/nostos/releases. This file is a consolidated, audita
 ### Documentation
 
 - Documented that `nostos update --verify` only succeeds against a maintainer-signed release tag, and added a signed-tag step (`git tag -s`) to the release checklist in MAINTAINERS.md. This makes the fail-closed `--verify` behaviour usable rather than aspirational, and keeps SECURITY.md honest about the precondition.
+- Moved `SECURITY.md` and `CONTRIBUTING.md` into `.github/` (GitHub's canonical location for community-health files; the Security tab and contributing prompts still resolve them there) and updated all relative cross-links. `README.md`, `LICENSE`, `CHANGELOG.md`, and `MAINTAINERS.md` remain at the repository root.
 
 ## [1.7.2] - 2026-07-13
 
