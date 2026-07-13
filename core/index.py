@@ -134,11 +134,17 @@ _INIT_LOCK = threading.Lock()
 
 
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
-    # journal_mode is a persistent, on-disk property of the database, so
-    # it is set once when the file is created (see connect()) rather than
-    # on every connection. busy_timeout, secure_delete, and foreign_keys
-    # are per-connection and must be re-applied each time.
+    # journal_mode=WAL is persistent, but it must be (re-)asserted on
+    # every connection under _INIT_LOCK: on a freshly-created DB, several
+    # worker threads (`nostos add --from-owner --workers N`, and the
+    # parallel clone path in `nostos import`) connect at once, and if only
+    # one of them established WAL, the others could write schema in
+    # rollback mode first and the WAL flip would then fail with "database
+    # is locked" (WAL setup does not honour busy_timeout). Setting it on
+    # every connection is an idempotent no-op once WAL is active and keeps
+    # all connections in agreement.
     conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA secure_delete = ON")
     conn.execute("PRAGMA foreign_keys = ON")
 
@@ -215,8 +221,6 @@ def connect(path: str | None = None) -> Iterator[sqlite3.Connection]:
         # WAL setup and on schema_version checks.
         with _INIT_LOCK:
             _apply_pragmas(conn)
-            if is_new:
-                conn.execute("PRAGMA journal_mode = WAL")
             _ensure_schema(conn)
         if is_new:
             # Belt-and-braces: re-assert 0600 on the file and its WAL/-shm
